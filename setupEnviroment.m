@@ -1,10 +1,11 @@
 function [env] = setupEnvironment(exp)
 
-ft_path       = 'C:\Users\fire-\OneDrive - rus10\#LIFE\MA\EEG_Experiment\fieldtrip-20230522';
+addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\');
+ft_path       = 'C:\Users\yoelgo\Documents\fieldtrip-20250114\';
 addpath(ft_path);
 ft_defaults;
 
-maindir              = '\\132.64.189.200\DataAyelet\Yarden\';
+maindir              = 'R:\Yarden\';
 preprocDir           = [maindir 'MONAD_preproc\'];
 
 env.exp = exp;
@@ -50,33 +51,7 @@ end
 
 
 
-
-paths = []; 
-paths.maindir       = 'C:\Users\fire-\OneDrive - rus10\#LIFE\MA\EEG_Experiment\';
-paths.raw_path      = 'D:\EEG_Data\';
-paths.clean_path    = 'D:\EEG_Data\';
-paths.LAVIdf        = 'D:\EEG_processed\';
-paths.trig_path     = [paths.maindir, 'Preproc_data\triggers\'];
-paths.ECG_path      = [paths.maindir, 'Preproc_data\ECG\'];
-paths.elec          = [paths.maindir 'fieldtrip-20230522\template\electrode\standard_1020.elc'];
-paths.plots         = [paths.maindir 'Plots\MATLAB_plots\'];
-
-plt = [];
-plt.b1Color = [245, 125, 81] / 256;
-plt.b2Color = [135, 95, 49] / 256;
-plt.blkColor = [175, 151, 172]/ 255;
-plt.blkAVGColor = [104, 80, 101]/ 255;
-plt.dark_grey = [84, 90, 99]/253;
-plt.light_grey = [200, 203, 208]/255;
-plt.light_blue = [152, 207, 222]/255;
-plt.lilac      = [185, 150, 197]/255;
-plt.peach      = [243, 212, 184]/255; 
-plt.beats = [1.5 4 9.5];
-plt.beats_ttl = ["Rhythm: 1.5bps", "Rhythm: 4bps", "Rhythm: 9.5bps"];
-
-
-lay = [paths.maindir 'landaulab_layout_62_P9-10.mat'];
-load(lay);
-elec = ft_read_sens(paths.elec);
+%paths.elec          = [paths.maindir 'fieldtrip-20230522\template\electrode\standard_1020.elc'];
+%elec = ft_read_sens(paths.elec);
 
 end
