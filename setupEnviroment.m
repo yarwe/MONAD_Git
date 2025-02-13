@@ -1,18 +1,41 @@
 function [env] = setupEnvironment(exp)
 
+% List of possible experiment names
+experiments = {'OSF_simple', 'OSF_complex', 'NIMH'};
+% Check if the provided experiment name exists in the list
+if ~ismember(exp, experiments)
+    error('Experiment name does not exist');  % Break and display error message
+end
+
 addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\');
 ft_path       = 'C:\Users\yoelgo\Documents\fieldtrip-20250114\';
 addpath(ft_path);
 ft_defaults;
-
 maindir              = 'R:\Yarden\';
-preprocDir           = [maindir 'MONAD_preproc\'];
-
+preprocDir           = [maindir 'analysis_MONAD\MONAD_preproc'];
 env.exp = exp;
+
+% Check if the folder for exp exists, if not, create it and the subfolders
+exp_folder = [maindir 'analysis_MONAD\MONAD_preproc\' exp '\'];
+if ~exist(exp_folder, 'dir')
+    % Create the main folder for the experiment
+    mkdir(exp_folder);
+    % Create subfolders
+    env.paths.auto      = [exp_folder 'automated\'];
+    env.paths.manual    = [exp_folder 'manual\'];
+    env.paths.art       = [exp_folder 'artifacts\'];
+    env.paths.clean     = [exp_folder 'clean\'];
+    % Create the directories
+    mkdir(env.paths.auto);
+    mkdir(env.paths.manual);
+    mkdir(env.paths.art);
+    mkdir(env.paths.clean);
+end
+
+% Existing code for handling specific experiments
 if strcmp('OSF_simple', exp)
-% OSF Simple
     env.paths.raw       = [maindir 'OSF data\Simple\'];
-    env.paths.preproc   = [preprocDir 'Analysis_Monad\OSF_simple\'];
+    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
     env.paths.auto      = [env.paths.preproc 'automated\'];
     env.paths.manual    = [env.paths.preproc 'manual\'];
     env.paths.art       = [env.paths.preproc 'artifacts\'];
@@ -37,7 +60,7 @@ elseif strcmp('OSF_complex', exp)
     env.paths.auto      = [env.paths.preproc 'automated\'];
     env.paths.manual    = [env.paths.preproc 'manual\'];
     env.paths.ICA       = [env.paths.preproc 'ICA\'];
-    env.paths.clean     = [env.paths.preproc 'clean\']
+    env.paths.clean     = [env.paths.preproc 'clean\'];
 
     cfg = [];
     cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
@@ -50,9 +73,5 @@ elseif strcmp('OSF_complex', exp)
     env.data.prefix     = '_ComplexSound.bdf';
 
 end
-
-
-%paths.elec          = [paths.maindir 'fieldtrip-20230522\template\electrode\standard_1020.elc'];
-%elec = ft_read_sens(paths.elec);
 
 end
