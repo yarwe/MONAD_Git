@@ -15,7 +15,8 @@ if strcmp('OSF_simple', exp)
     env.paths.preproc   = [preprocDir 'Analysis_Monad\OSF_simple\'];
     env.paths.auto      = [env.paths.preproc 'automated\'];
     env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.ICA       = [env.paths.preproc 'ICA\'];
+    env.paths.art       = [env.paths.preproc 'artifacts\'];
+    env.paths.clean     = [env.paths.preproc 'clean\'];
 
     cfg = [];
     cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
@@ -26,6 +27,9 @@ if strcmp('OSF_simple', exp)
     env.data.ID         = cellfun(@(x) regexprep(x, '_.*', ''), env.data.names, 'UniformOutput', false);
     env.data.files      = fullfile(env.paths.raw, env.data.names);
     env.data.prefix     = '_Simpletone.bdf';
+    env.data.linenoise  = 50;
+    
+    env.elec.ref        = [129 130];
 
 elseif strcmp('OSF_complex', exp)
     env.paths.raw       = [maindir 'OSF data\Complex\'];
@@ -46,9 +50,6 @@ elseif strcmp('OSF_complex', exp)
     env.data.prefix     = '_ComplexSound.bdf';
 
 end
-
-    
-
 
 
 %paths.elec          = [paths.maindir 'fieldtrip-20230522\template\electrode\standard_1020.elc'];

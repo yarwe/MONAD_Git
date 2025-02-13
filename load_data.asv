@@ -1,29 +1,50 @@
-function [outputArg1,outputArg2] = untitled(env, filename)
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
-addpath('C:\Users\yoelgo\Documents\eeglab2024.2\');
-eeglab;
-if strmp(exp, 'OSF_simple')
-    EEG          = pop_biosig(filename);
-    % Create an empty FieldTrip struct
-    data_ft = [];
-    
-    % Assign EEG data fields
-    data_ft.label = {EEG.chanlocs.labels};       % Channel labels
-    data_ft.fsample = EEG.srate;                 % Sampling rate
-    data_ft.trial = {double(EEG.data)};          % EEG data (convert to double)
-    data_ft.time = {EEG.times / 1000};           % Convert time from ms to seconds
-    data_ft.hdr = EEG;                           % Add header information if needed
+function [ftEEG] = load_data(env, filename)
+    % load data for each data-set
+    addpath('C:\Users\yoelgo\Documents\eeglab2024.2\');
+    eeglab; close all
+    clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
 
-    cfg =[];
-    pD = ft_preprocessing([],data_ft)
+    if strcmp(env.exp, 'OSF_simple') || strcmp(env.exp, 'OSF_complex')
+        EEG = pop_biosig(filename);
+        ftEEG = biosig2ft(EEG);
+        
+        %extracting EOG signals from horizontal sensors
+        cfg = [];
+        cfg.channel = {'LO1' 'LO2'};
+        cfg.refref = 'yes';
+        cfg.refchannel = {'LO1'};
+        eogH = ft_preprocessing(cfg, ftEEG);
+        %keep only one channel and rename to eogH
+        cfg = [];
+        cfg.channel = {'LO2'};
+        eogH = ft_selectdata(cfg,eogH);
+        eogH.label = {'eogH'};
 
-
+        %extracting EOG signals from vertical sensors
+        cfg = [];
+        cfg.channel = {'IO1' 'SO1'};
+        cfg.refref = 'yes';
+        cfg.refchannel = {'SO1'};
+        eogV = ft_preprocessing(cfg, ftEEG);
+        %keep only one channel and rename to eogV
+        cfg = [];
+        cfg.channel = {'IO1'};
+        eogV = ft_selectdata(cfg,eogV);
+        eogV.label = {'eogV'};
+        
+        % Rename specific channels
+        cfg = [];
+        cfg.channel = {'M1', 'M2'};
+        ref = ft_select_data(cfg,ftEEG);
+        ref.label = {'ref1','ref2'};
+        
+        channels_to_keep = env.lay.label(:);
+        % Select the channels to keep
+        cfg = [];
+        cfg.channel = channels_to_keep;  % Ensure both are column vectors
+        ftEEG = ft_preprocessing(cfg, ftEEG);  % Process the data with the selected channels
+        % append EEG and EOG
+        ftEEG = ft_appenddata([],ftEEG,ref, eogH,eogV);
+        
+    end
 end
-end
-%%
-addpath('C:\Users\yoelgo\Documents\fieldtrip-20250114\');
-cfg             = [];
-cfg.dataset     = ["R:\Experiments\Yoel\Data\EEG_Data\S05_MK\S05_MK.mat"];
-cfg.continuous  = 'yes';
-dat1 = ft_preprocessing(cfg);
