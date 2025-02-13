@@ -21,23 +21,24 @@ cfg.reref      = 'yes';
 cfg.refchannel = {'ref1', 'ref2'};  
 pEEG = ft_preprocessing(cfg, EEG);
 
-
-
 %% high amplitude artifact detection
-cfg = [];
-cfg.continuous                   = 'yes';
-cfg.artfctdef.zvalue.channel     = 'all';
-cfg.artfctdef.zvalue.cutoff      = 50;
-cfg.artfctdef.zvalue.artpadding  = 0.1;
-cfg.artfctdef.zvalue.zscore      = 'yes';
-cfg.artfctdef.zvalue.interactive = 'yes';
-[cfg, z_artifact] = ft_artifact_zvalue(cfg, raw);
+Zcfg = [];
+Zcfg.continuous                   = 'yes';
+Zcfg.artfctdef.zvalue.channel     = {'all', '-eogV', '-eogH', '-ref1', '-ref2'};
+Zcfg.artfctdef.zvalue.cutoff      = 50;
+Zcfg.artfctdef.zvalue.artpadding  = 0.1;
+Zcfg.artfctdef.zvalue.zscore      = 'yes';
+Zcfg.artfctdef.zvalue.interactive = 'yes';
+[Zcfg, z_artifact] = ft_artifact_zvalue(Zcfg, pEEG);
+
 %% reject atrifact 
 cfg = []; 
 cfg.artfctdef.reject            = 'nan';
 cfg.artfctdef.visual.artifact   = z_artifact;
 datRaw_ref_zart = ft_rejectartifact(cfg,raw);
 
+save([env.paths. ID '_Zartifact'], "Zcfg");
+writeCSV(env,ID,cfg, Zcfg, pEEG);
 %% Manual: View Data
 cfg = [];
 cfg.ylim  = [-30 30];

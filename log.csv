@@ -1,0 +1,2 @@
+exp,ID,filters,detrend,reref,Zcutoff,Zremove(%)
+OSF_simple,A10,"HP:0.5Hz, DFT:[50.0Hz, 100.0Hz]",yes,yes,47,2.22

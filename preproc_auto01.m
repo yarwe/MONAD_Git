@@ -9,17 +9,17 @@ EEG         = load_data(env, filename);
 
 clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
 %% basic preproc
-cfg            = [];
-cfg.channel    = 'all';  % Do not remove ref1/ref2
-cfg.detrend    = 'yes';
-cfg.continuous = 'yes';
-cfg.hpfilter    = 'yes';
-cfg.dftfilter = 'yes';
-cfg.dftfreq = [env.data.linenoise env.data.linenoise*2]; % line noise removal
-cfg.hpfreq      = 0.5;
-cfg.reref      = 'yes';
-cfg.refchannel = {'ref1', 'ref2'};  
-pEEG = ft_preprocessing(cfg, EEG);
+Pcfg            = [];
+Pcfg.channel    = 'all';  % Do not remove ref1/ref2
+Pcfg.detrend    = 'yes';
+Pcfg.continuous = 'yes';
+Pcfg.hpfilter    = 'yes';
+Pcfg.dftfilter = 'yes';
+Pcfg.dftfreq = [env.data.linenoise env.data.linenoise*2]; % line noise removal
+Pcfg.hpfreq      = 0.5;
+Pcfg.reref      = 'yes';
+Pcfg.refchannel = {'ref1', 'ref2'};  
+pEEG = ft_preprocessing(Pcfg, EEG);
 
 %% high amplitude artifact detection
 Zcfg = [];
@@ -31,21 +31,20 @@ Zcfg.artfctdef.zvalue.zscore      = 'yes';
 Zcfg.artfctdef.zvalue.interactive = 'yes';
 [Zcfg, z_artifact] = ft_artifact_zvalue(Zcfg, pEEG);
 
-save([env.paths. subj_name '_man_artifact'], "man_artifact");
-writeCSV(env,ID,cfg, Zcfg, pEEG);
 %% reject atrifact 
 cfg = []; 
 cfg.artfctdef.reject            = 'nan';
 cfg.artfctdef.visual.artifact   = z_artifact;
-datRaw_ref_zart = ft_rejectartifact(cfg,raw);
+pEEG_zclean = ft_rejectartifact(cfg,pEEG);
 
-
+save([env.paths.art ID '_Zartifact'], "z_artifact");
+writeCSV_auto(env,ID,Pcfg, Zcfg, pEEG);
 %% Manual: View Data
 cfg = [];
 cfg.ylim  = [-30 30];
 cfg.blocksize = 720;
-man_artifact = ft_databrowser(cfg,datRaw_ref_zart)
-save([artifact_path subj_name '_man_artifact'], "man_artifact");
+man_artifact = ft_databrowser(cfg,pEEG_zclean)
+save([env.paths.art ID '_MANartifact'], "z_artifact");
 %% Manual: Remove Artifacts
 cfg = []; 
 cfg.artfctdef.reject           = 'nan';
