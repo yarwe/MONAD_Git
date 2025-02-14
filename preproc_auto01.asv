@@ -114,9 +114,7 @@ save([env.paths.art ID '_ICAcomp'], "comp");
 cfg = [];
 cfg.component = [1,4]
 dat_after_ICA = ft_rejectcomponent(cfg, comp);
-
-
-csv_addCol(env, ID, {'ICA_comp'}, {strjoin(string(cfg.component), ', ')});
+csv_addCol(env, ID, {'ICA_comp'}, {string({cfg.component})});
 %% view the data again
 cfg = [];
 cfg.ylim  = [-30 30];
