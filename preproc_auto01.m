@@ -6,39 +6,46 @@ env = setupEnviroment('OSF_simple');
 ID          = env.data.ID{1};
 filename    = [env.paths.raw ID env.data.prefix];
 EEG         = load_data(env, filename);
+csv_init(env, ID);
 
 clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
 %% basic preproc
-Pcfg            = [];
-Pcfg.channel    = 'all';  % Do not remove ref1/ref2
-Pcfg.detrend    = 'yes';
-Pcfg.continuous = 'yes';
-Pcfg.hpfilter    = 'yes';
-Pcfg.dftfilter = 'yes';
-Pcfg.dftfreq = [env.data.linenoise env.data.linenoise*2]; % line noise removal
-Pcfg.hpfreq      = 0.5;
-Pcfg.reref      = 'yes';
-Pcfg.refchannel = {'ref1', 'ref2'};  
-pEEG = ft_preprocessing(Pcfg, EEG);
+cfg            = [];
+cfg.channel     = 'all';  % Do not remove ref1/ref2
+cfg.detrend     = 'yes';
+cfg.continuous  = 'yes';
+cfg.hpfilter    = 'yes';
+cfg.demean      = 'yes';
+cfg.dftfilter   = 'yes';
+cfg.dftfreq     = [env.data.linenoise env.data.linenoise*2]; % line noise removal
+cfg.hpfreq      = 0.5;
+cfg.reref       = 'yes';
+cfg.refchannel  = {'ref1', 'ref2'};  
+pEEG = ft_preprocessing(cfg, EEG);
+
+csv_addCol(env, ID, {'hpfilter', 'dftfilter', 'detrend', 'demean'}, {cfg.hpfreq, cfg.dftfreq(1), cfg.detrend, cfg.demean});
 
 %% high amplitude artifact detection
-Zcfg = [];
-Zcfg.continuous                   = 'yes';
-Zcfg.artfctdef.zvalue.channel     = {'all', '-eogV', '-eogH', '-ref1', '-ref2'};
-Zcfg.artfctdef.zvalue.cutoff      = 50;
-Zcfg.artfctdef.zvalue.artpadding  = 0.1;
-Zcfg.artfctdef.zvalue.zscore      = 'yes';
-Zcfg.artfctdef.zvalue.interactive = 'yes';
-[Zcfg, z_artifact] = ft_artifact_zvalue(Zcfg, pEEG);
+cfg = [];
+cfg.continuous                   = 'yes';
+cfg.artfctdef.zvalue.channel     = {'all', '-eogV', '-eogH', '-ref1', '-ref2'};
+cfg.artfctdef.zvalue.cutoff      = 50;
+cfg.artfctdef.zvalue.artpadding  = 0.1;
+cfg.artfctdef.zvalue.zscore      = 'yes';
+cfg.artfctdef.zvalue.interactive = 'yes';
+[cfg, z_artifact] = ft_artifact_zvalue(cfg, pEEG);
 
+Zrem = sum(cfg.artfctdef.zvalue.artifact(:, 2) - cfg.artfctdef.zvalue.artifact(:, 1))/...
+    size(pEEG.time{1},2) * 100;
+csv_addCol(env, ID, {'Zval', 'Zart_num', 'Zremoved(%)'}, {cfg.artfctdef.zvalue.cutoff, ...
+    size(cfg.artfctdef.zvalue.artifact,1), Zrem});
 %% reject atrifact 
 cfg = []; 
 cfg.artfctdef.reject            = 'nan';
 cfg.artfctdef.visual.artifact   = z_artifact;
 pEEG_zclean = ft_rejectartifact(cfg,pEEG);
 
-save([env.paths.art ID '_Zartifact'], "z_artifact");
-writeCSV_auto(env,ID,Pcfg, Zcfg, pEEG);
+%save([env.paths.art ID '_Zartifact'], "z_artifact");
 %% Manual: View Data
 cfg = [];
 cfg.ylim  = [-30 30];
@@ -51,6 +58,11 @@ cfg.artfctdef.reject           = 'nan';
 cfg.artfctdef.visual.artifact = man_artifact.artfctdef.visual.artifact;
 datRaw_ref_zart = ft_rejectartifact(cfg,datRaw_ref_zart);
 
+% update csv
+if isempty(man_artifact.artfctdef.visual.artifact); man_artifact.artfctdef.visual.artifact = '--'; end
+Mrem = sum(man_artifact.artfctdef.visual.artifact(:, 2) - man_artifact.artfctdef.visual.artifact(:, 1))/...
+    size(pEEG_zclean.time{1},2) * 100;
+csv_addCol(env, ID, {'MAN_art_num', 'MANremoved(%)'}, {size(man_artifact.artfctdef.visual.artifact,1), Mrem});
 %% Manual: Remove Channel (by trial or all)
 % Run this cell only if there are channels to remove
 % A code I built which can fix a channel (based on adjacent channels) in
