@@ -1,5 +1,5 @@
 function csv_addCol(env, ID, colNames, colValues)
-    logFile = 'log.csv';
+    logFile = 'R:\Yarden\MONAD_log.csv';
     
     if ~isfile(logFile)
         error('log.csv does not exist. Please initialize it using csv_init first.');

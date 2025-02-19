@@ -12,6 +12,7 @@ ft_path       = 'C:\Users\yoelgo\Documents\fieldtrip-20250114\';
 env.paths.ft_path = ft_path;
 addpath(ft_path);
 ft_defaults;
+
 maindir              = 'R:\Yarden\';
 preprocDir           = [maindir 'analysis_MONAD\MONAD_preproc'];
 env.exp = exp;

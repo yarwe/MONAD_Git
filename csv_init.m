@@ -1,5 +1,5 @@
 function csv_init(env, ID)
-    logFile = 'log.csv';
+    logFile = 'R:\Yarden\MONAD_log.csv';
     
     if ~isfile(logFile)
         % If log.csv does not exist, create it with the initial structure.
