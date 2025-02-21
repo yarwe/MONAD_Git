@@ -8,6 +8,18 @@ function [ftEEG] = load_data(env, filename)
         EEG = pop_biosig(filename);
         ftEEG = biosig2ft(EEG);
         
+        % Rename specific channels
+        cfg = [];
+        cfg.channel = {ftEEG.label{129}, ftEEG.label{130}};
+        ref = ft_selectdata(cfg,ftEEG);
+        ref.label = {'ref1','ref2'};
+        
+        cfg = [];
+        cfg.channel = {ftEEG.label{129+2}, ftEEG.label{130+2}, ftEEG.label{131+2}, ftEEG.label{132+2}};
+        cfg.reref = 'yes';
+        cfg.refchannel = {ftEEG.label{129}, ftEEG.label{130}};
+        EOG = ft_preprocessing(cfg, ftEEG);
+       
         %extracting EOG signals from horizontal sensors
         cfg = [];
         cfg.channel = {ftEEG.label{129+2}, ftEEG.label{130+2}};  % the reason I add 2 is because I don't remove the ref channels as they do in theyr code.
@@ -32,11 +44,6 @@ function [ftEEG] = load_data(env, filename)
         eogV = ft_selectdata(cfg,eogV);
         eogV.label = {'eogV'};
         
-        % Rename specific channels
-        cfg = [];
-        cfg.channel = {ftEEG.label{129}, ftEEG.label{130}};
-        ref = ft_selectdata(cfg,ftEEG);
-        ref.label = {'ref1','ref2'};
         
         % Select the channels to keep
         cfg = [];
