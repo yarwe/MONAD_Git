@@ -1,5 +1,6 @@
 clc; clear all;
-cd('C:\Users\yoelgo\Desktop\MONAD_Git');
+cd('C:\Users\yoelgo\Desktop\MONAD_Git\');
+addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\');
 env = setupEnviroment('OSF_simple');
 %% Load single participant
 ID          = env.data.ID{10};
