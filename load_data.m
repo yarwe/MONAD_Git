@@ -8,42 +8,48 @@ function [ftEEG] = load_data(env, filename)
         EEG = pop_biosig(filename);
         ftEEG = biosig2ft(EEG);
         
+        ftEEG.label{129} = 'ref1';
+        ftEEG.label{130} = 'ref2';
+        ftEEG.label{131} = 'eogH1';
+        ftEEG.label{132} = 'eogH2';
+        ftEEG.label{133} = 'eogV1';
+        ftEEG.label{134} = 'eogV2';
+
+        % select eye channels
+        cfg = [];
+        cfg.channel = {'eogH1', 'eogH2', 'eogV1', 'eogV2'};
+        eogDat = ft_selectdata(cfg,ftEEG);
+
         %extracting EOG signals from horizontal sensors
         cfg = [];
-        cfg.channel = {ftEEG.label{129+2}, ftEEG.label{130+2}};  % the reason I add 2 is because I don't remove the ref channels as they do in theyr code.
+        cfg.channel = {'eogH1' 'eogH2'};
         cfg.refref = 'yes';
-        cfg.refchannel = {ftEEG.label{129+2}};
-        eogH = ft_preprocessing(cfg, ftEEG);
+        cfg.refchannel = {'eogH1'};
+        eogH = ft_preprocessing(cfg,eogDat);
         %keep only one channel and rename to eogH
         cfg = [];
-        cfg.channel = {ftEEG.label{130+2}};
+        cfg.channel = {'eogH2'};
         eogH = ft_selectdata(cfg,eogH);
         eogH.label = {'eogH'};
 
         %extracting EOG signals from vertical sensors
         cfg = [];
-        cfg.channel = {ftEEG.label{131+2} ftEEG.label{132+2}};
+        cfg.channel = {'eogV1' 'eogV2'};
         cfg.refref = 'yes';
-        cfg.refchannel = ftEEG.label{131+2};
-        eogV = ft_preprocessing(cfg, ftEEG);
-        %keep only one channel and rename to eogV
+        cfg.refchannel = {'eogV1'};
+        eogV = ft_preprocessing(cfg,eogDat);
+        %keep only one channel and rename to eogH
         cfg = [];
-        cfg.channel = {ftEEG.label{132+2}};
+        cfg.channel = {'eogV2'};
         eogV = ft_selectdata(cfg,eogV);
         eogV.label = {'eogV'};
-        
-        % Rename specific channels
-        cfg = [];
-        cfg.channel = {ftEEG.label{129}, ftEEG.label{130}};
-        ref = ft_selectdata(cfg,ftEEG);
-        ref.label = {'ref1','ref2'};
-        
+
         % Select the channels to keep
         cfg = [];
-        cfg.channel = env.lay.label(:);
-        ftEEG = ft_preprocessing(cfg, ftEEG);  % Process the data with the selected channels
+        cfg.channel = {env.lay.label{1:64}, 'ref1', 'ref2'};
+        ftEEG = ft_selectdata(cfg, ftEEG);  % Process the data with the selected channels
         % append EEG and EOG
-        ftEEG = ft_appenddata([],ftEEG,ref, eogH,eogV);
+        ftEEG = ft_appenddata([],ftEEG, eogH, eogV);
         
     end
 end

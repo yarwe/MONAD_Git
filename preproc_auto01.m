@@ -19,12 +19,15 @@ cfg.dftfilter   = 'yes';
 cfg.dftfreq     = [env.data.linenoise env.data.linenoise*2]; % line noise removal
 cfg.lpfilter    = 'yes';
 cfg.lpfreq      = 80;
-cfg.hpfreq      = 0.5;
-cfg.reref       = 'yes';
-cfg.refchannel  = {'ref1', 'ref2'};  
+cfg.hpfreq      = 0.5; 
 pEEG = ft_preprocessing(cfg, EEG);
 
 csv_addCol(env, ID, {'hpfilter', 'lpfilter', 'dftfilter','detrend', 'demean'}, {cfg.hpfreq, cfg.lpfreq ,cfg.dftfreq(1), cfg.detrend, cfg.demean});
+
+cfg = []; 
+cfg.reref       = 'yes';
+cfg.refchannel  = {'ref1' 'ref2'}; 
+pEEG = ft_preprocessing(cfg,pEEG); 
 
 %% high amplitude artifact detection
 cfg = [];
@@ -48,7 +51,6 @@ pEEG_zclean = ft_rejectartifact(cfg,pEEG);
 
 save([env.paths.art ID '_Zartifact'], "z_artifact");
 %% Manual: View Data
-
 cfg = [];
 cfg.ylim  = [-30 30];
 cfg.blocksize = 30;
