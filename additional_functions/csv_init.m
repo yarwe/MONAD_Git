@@ -1,5 +1,9 @@
-function csv_init(env, ID)
-    logFile = 'R:\Yarden\MONAD_log.csv';
+function csv_init(env, ID, dat_ay)
+    if ~exist('dat_ay','var')
+        logFile = 'R:\Yarden\MONAD_log.csv';
+    else
+        logFile = [dat_ay ':\Yarden\MONAD_log.csv'];
+    end
     
     if ~isfile(logFile)
         % If log.csv does not exist, create it with the initial structure.

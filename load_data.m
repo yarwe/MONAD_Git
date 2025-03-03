@@ -1,6 +1,11 @@
-function [ftEEG] = load_data(env, filename)
+function [ftEEG] = load_data(env, filename, eeglab_path)
     % load data for each data-set
-    addpath('C:\Users\yoelgo\Documents\eeglab2024.2\');
+
+    % Yarden addition
+    if ~exist('eeglab_path','var')
+        eeglab_path = 'C:\Users\yoelgo\Documents\eeglab2024.2\';
+    end
+    addpath(eeglab_path);
     eeglab; close all
     clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
 

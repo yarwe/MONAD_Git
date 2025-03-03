@@ -1,12 +1,28 @@
-clc; clear all;
-cd('C:\Users\yoelgo\Desktop\MONAD_Git\');
-addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\');
-env = setupEnviroment('OSF_simple');
+%% Clear all, and get relevant paths
+clc; clear all; close all;
+% cd('C:\Users\yoelgo\Desktop\MONAD_Git\'); % Yarden commented
+addpath('C:\Users\yarde\Documents\MATLAB\MONAD YOEL\') 
+% addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\'); % Yarden commented
+add_func_path='C:\Users\yarde\Documents\MATLAB\MONAD YOEL\additional functions\';
+matlab_path='C:\Users\yarde\Documents\MATLAB\';
+ft_path=[matlab_path 'fieldtrip-20210614\'];
+eeglab_path='C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4\biosig\eeglab\';
+
+
+%%
+addpath(add_func_path);
+dat_ay='Z';
+% Make sure you are connected to data ayelet
+env = setupEnviroment('OSF_simple',add_func_path,ft_path,dat_ay);
 %% Load single participant
+
+cd C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4
+biosig_installer;
+
 ID          = env.data.ID{10};
 filename    = [env.paths.raw ID env.data.prefix];
-EEG         = load_data(env, filename);
-csv_init(env, ID);
+EEG         = load_data(env, filename, eeglab_path);
+csv_init(env, ID, dat_ay);
 
 clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
 %% basic preproc
@@ -23,7 +39,10 @@ cfg.lpfreq      = 80;
 cfg.hpfreq      = 0.5; 
 pEEG = ft_preprocessing(cfg, EEG);
 
-csv_addCol(env, ID, {'hpfilter', 'lpfilter', 'dftfilter','detrend', 'demean'}, {cfg.hpfreq, cfg.lpfreq ,cfg.dftfreq(1), cfg.detrend, cfg.demean});
+csv_addCol(env, ID,...
+    {'hpfilter', 'lpfilter', 'dftfilter','detrend', 'demean'},...
+    {cfg.hpfreq, cfg.lpfreq ,cfg.dftfreq(1), cfg.detrend, cfg.demean},...
+    dat_ay);
 
 cfg = []; 
 cfg.reref       = 'yes';

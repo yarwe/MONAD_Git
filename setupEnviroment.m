@@ -1,4 +1,4 @@
-function [env] = setupEnvironment(exp)
+function [env] = setupEnvironment(exp,add_func_path,ft_path,dat_ay_letter)
 
 % List of possible experiment names
 experiments = {'OSF_simple', 'OSF_complex', 'NIMH'};
@@ -7,13 +7,24 @@ if ~ismember(exp, experiments)
     error('Experiment name does not exist');  % Break and display error message
 end
 
-addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\');
-ft_path       = 'C:\Users\yoelgo\Documents\fieldtrip-20250114\';
+% Yarden additions
+if ~exist('add_func_path','var')
+    add_func_path = 'C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\';
+end
+if ~exist('ft_path','var')
+    ft_path       = 'C:\Users\yoelgo\Documents\fieldtrip-20250114\';
+end
+if ~exist('dat_ay_letter','var')
+    dat_ay_letter = 'R';
+end
+
+addpath(add_func_path);
+%
 env.paths.ft_path = ft_path;
 addpath(ft_path);
 ft_defaults;
 
-maindir              = 'R:\Yarden\';
+maindir              = [dat_ay_letter ':\Yarden\'];
 preprocDir           = [maindir 'analysis_MONAD\MONAD_preproc'];
 env.exp = exp;
 
