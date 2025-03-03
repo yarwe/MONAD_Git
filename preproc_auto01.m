@@ -1,24 +1,28 @@
-%% Clear all, and get relevant paths
+%% Clear all 
 clc; clear all; close all;
+%% Get relevant paths - adapt to your PC (!)
 % cd('C:\Users\yoelgo\Desktop\MONAD_Git\'); % Yarden commented
-addpath('C:\Users\yarde\Documents\MATLAB\MONAD YOEL\') 
+load('matlab.mat')
+addpath(h)
+% addpath('C:\Users\yarde\Documents\GitHub\MONAD_Git\') % MONAD_Git PATH 
 % addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\'); % Yarden commented
-add_func_path='C:\Users\yarde\Documents\MATLAB\MONAD YOEL\additional functions\';
+add_func_path='C:\Users\yarde\Documents\GitHub\MONAD_Git\additional_functions\'; % additinal_functions path in MONAD_Git
+
 matlab_path='C:\Users\yarde\Documents\MATLAB\';
 ft_path=[matlab_path 'fieldtrip-20210614\'];
+
 eeglab_path='C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4\biosig\eeglab\';
 
+dat_ay='Z'; % Make sure you are connected to data ayelet (!)
 
-%%
-addpath(add_func_path);
-dat_ay='Z';
-% Make sure you are connected to data ayelet
-env = setupEnviroment('OSF_simple',add_func_path,ft_path,dat_ay);
-%% Load single participant
-
+% Yarden additions to her PC due to issues with biosig
 cd C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4
 biosig_installer;
 
+%%
+addpath(add_func_path);
+env = setupEnviroment('OSF_simple',add_func_path,ft_path,dat_ay);
+%% Load single participant
 ID          = env.data.ID{10};
 filename    = [env.paths.raw ID env.data.prefix];
 EEG         = load_data(env, filename, eeglab_path);
@@ -62,7 +66,7 @@ cfg.artfctdef.zvalue.interactive = 'yes';
 Zrem = sum(cfg.artfctdef.zvalue.artifact(:, 2) - cfg.artfctdef.zvalue.artifact(:, 1))/...
     size(pEEG.time{1},2) * 100;
 csv_addCol(env, ID, {'Zval', 'Zart_num', 'Z_rem'}, {cfg.artfctdef.zvalue.cutoff, ...
-    size(cfg.artfctdef.zvalue.artifact,1), Zrem});
+    size(cfg.artfctdef.zvalue.artifact,1), Zrem}, dat_ay);
 %% reject atrifact 
 cfg = []; 
 cfg.artfctdef.reject            = 'nan';
@@ -95,7 +99,7 @@ pEEG_mclean = ft_selectdata(cfg,pEEG_mclean)
 if isempty(man_art); man_art = '--'; end
 Mrem = sum(man_art(:, 2) - man_art(:, 1))/...
     size(pEEG_zclean.time{1},2) * 100;
-csv_addCol(env, ID, {'manual_art_num', 'manual_rem', 'ch_interpolate'}, {size(man_art,1), Mrem, '--'});
+csv_addCol(env, ID, {'manual_art_num', 'manual_rem', 'ch_interpolate'}, {size(man_art,1), Mrem, '--'},dat_ay);
 clear z_artifact Zrem Mrem man_art 
 %% Manual: Remove Channel (by trial or all)
 % Run this cell only if there are channels to remove
@@ -125,7 +129,7 @@ if ~isempty(badchannel)
     end
 end
 
-csv_addCol(env, ID, {'ch_interpolate'}, {badchannel});
+csv_addCol(env, ID, {'ch_interpolate'}, {badchannel}, dat_ay);
 %% Run ICA
 addpath([env.paths.ft_path 'external\eeglab\']);
 cfg = [];
@@ -173,7 +177,7 @@ cfg.component = [1]
 dat_after_ICA = ft_rejectcomponent(cfg, comp);
 
 
-csv_addCol(env, ID, {'ICA_comp'}, {strjoin(string(cfg.component), ', ')});
+csv_addCol(env, ID, {'ICA_comp'}, {strjoin(string(cfg.component), ', ')},dat_ay);
 %% view the data again
 cfg = [];
 cfg.ylim  = [-30 30];
