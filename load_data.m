@@ -1,15 +1,9 @@
-function [ftEEG] = load_data(env, filename, eeglab_path)
+function [ftEEG] = load_data(env, filename)
     % load data for each data-set
-
-    % Yarden addition
-    if ~exist('eeglab_path','var')
-        eeglab_path = 'C:\Users\yoelgo\Documents\eeglab2024.2\';
-    end
-    addpath(eeglab_path);
-    eeglab; close all
     clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
-
     if strcmp(env.exp, 'OSF_simple') || strcmp(env.exp, 'OSF_complex')
+        addpath(genpath(env.paths.eeglab));
+        eeglab; close all
         EEG = pop_biosig(filename);
         ftEEG = biosig2ft(EEG);
         

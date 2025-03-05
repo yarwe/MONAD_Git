@@ -1,8 +1,8 @@
-function csv_init(env, ID, dat_ay)
-    if ~exist('dat_ay','var')
+function csv_init(env, ID)
+    if ~exist('env.dat_ay','var')
         logFile = 'R:\Yarden\MONAD_log.csv';
     else
-        logFile = [dat_ay ':\Yarden\MONAD_log.csv'];
+        logFile = [env.dat_ay ':\Yarden\MONAD_log.csv'];
     end
     
     if ~isfile(logFile)

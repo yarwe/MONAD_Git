@@ -1,34 +1,44 @@
-function [env] = setupEnvironment(exp,add_func_path,ft_path,dat_ay_letter)
+function [env] = setupEnvironment(exp)
 
 % List of possible experiment names
-experiments = {'OSF_simple', 'OSF_complex', 'NIMH'};
+experiments = {'OSF_simple', 'OSF_complex', 'tk'};
 % Check if the provided experiment name exists in the list
 if ~ismember(exp, experiments)
     error('Experiment name does not exist');  % Break and display error message
 end
 
-% Yarden additions
-if ~exist('add_func_path','var')
-    add_func_path = 'C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\';
-end
-if ~exist('ft_path','var')
-    ft_path       = 'C:\Users\yoelgo\Documents\fieldtrip-20250114\';
-end
-if ~exist('dat_ay_letter','var')
-    dat_ay_letter = 'R';
+% setup paths according to user.
+[user, dat_ay_letter] = user_func();
+
+if strcmp(user, 'yoel')
+    git_path    = 'C:\Users\yoelgo\Documents\GitHub\MONAD_Git\';
+    matlab_path = 'C:\Program Files\MATLAB\';
+    ft_path     = [matlab_path 'fieldtrip-20250114\fieldtrip-20250114\'];
+    eeglab_path = [matlab_path 'eeglab_current\eeglab2025.0.0\'];
+    maindir     = [dat_ay_letter ':\Yarden\'];
+    
+else
+    git_path    = 'C:\Users\yarde\Documents\GitHub\MONAD_Git\'; % additinal_functions path in MONAD_Git
+    matlab_path = 'C:\Users\yarde\Documents\MATLAB\';
+    ft_path     = [matlab_path 'fieldtrip-20210614\'];
+    eeglab_path = [matlab_path 'biosig4octmat-3.8.4\biosig\eeglab\'];
+    maindir     = [dat_ay_letter ':\Yarden\'];
+    % Yarden additions to her PC due to issues with biosig
+    addpath C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4;
+    biosig_installer;
 end
 
-addpath(add_func_path);
-%
-env.paths.ft_path = ft_path;
+extra_func_path = [git_path 'additional_functions\'];
+addpath(extra_func_path); % Yarden commented
 addpath(ft_path);
-ft_defaults;
+ft_defaults();
 
-maindir              = [dat_ay_letter ':\Yarden\'];
 preprocDir           = [maindir 'analysis_MONAD\MONAD_preproc'];
-env.exp = exp;
-
-% Check if the folder for exp exists, if not, create it and the subfolders
+env.exp              = exp;
+env.paths.extra_func = extra_func_path;
+env.paths.eeglab     = eeglab_path;
+env.dat_ay           = dat_ay_letter;
+% Check if the folder for this exp exists, if not, create it and the subfolders
 exp_folder = [maindir 'analysis_MONAD\MONAD_preproc\' exp '\'];
 if ~exist(exp_folder, 'dir')
     % Create the main folder for the experiment
@@ -53,9 +63,12 @@ if strcmp('OSF_simple', exp)
     env.paths.manual    = [env.paths.preproc 'manual\'];
     env.paths.art       = [env.paths.preproc 'artifacts\'];
     env.paths.clean     = [env.paths.preproc 'clean\'];
+    env.paths.ft_path = ft_path;
 
+    
+    
     cfg = [];
-    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
+    cfg.layout = fullfile([ft_path '\template\layout\EEG1010.lay']);
     env.lay = ft_prepare_layout(cfg);
 
     env.data.type       = 'bdf';

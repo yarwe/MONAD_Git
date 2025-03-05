@@ -1,37 +1,22 @@
 %% Clear all 
+cd('C:\Users\yoelgo\Documents\GitHub\MONAD_Git');
+%cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
 clc; clear all; close all;
-%% Get relevant paths - adapt to your PC (!)
-% cd('C:\Users\yoelgo\Desktop\MONAD_Git\'); % Yarden commented
-load('matlab.mat')
-addpath(h)
-% addpath('C:\Users\yarde\Documents\GitHub\MONAD_Git\') % MONAD_Git PATH 
-% addpath('C:\Users\yoelgo\Desktop\MONAD_Git\additional_functions\'); % Yarden commented
-add_func_path='C:\Users\yarde\Documents\GitHub\MONAD_Git\additional_functions\'; % additinal_functions path in MONAD_Git
-
-matlab_path='C:\Users\yarde\Documents\MATLAB\';
-ft_path=[matlab_path 'fieldtrip-20210614\'];
-
-eeglab_path='C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4\biosig\eeglab\';
-
-dat_ay='Z'; % Make sure you are connected to data ayelet (!)
-
-% Yarden additions to her PC due to issues with biosig
-cd C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4
-biosig_installer;
-
 %%
-addpath(add_func_path);
-env = setupEnviroment('OSF_simple',add_func_path,ft_path,dat_ay);
+env = setupEnviroment('OSF_simple');
+addpath(env.paths.extra_func);
 %% Load single participant
 ID          = env.data.ID{10};
 filename    = [env.paths.raw ID env.data.prefix];
-EEG         = load_data(env, filename, eeglab_path);
-csv_init(env, ID, dat_ay);
+EEG         = load_data(env, filename);
+csv_init(env, ID);
 
-clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
+clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY TMPEEG
+
+
 %% basic preproc
 cfg            = [];
-cfg.channel     = {'all'};  % Do not remove ref1/ref2
+cfg.channel     = 'all';  % Do not remove ref1/ref2
 cfg.detrend     = 'yes';
 cfg.continuous  = 'yes';
 cfg.hpfilter    = 'yes';
@@ -45,8 +30,7 @@ pEEG = ft_preprocessing(cfg, EEG);
 
 csv_addCol(env, ID,...
     {'hpfilter', 'lpfilter', 'dftfilter','detrend', 'demean'},...
-    {cfg.hpfreq, cfg.lpfreq ,cfg.dftfreq(1), cfg.detrend, cfg.demean},...
-    dat_ay);
+    {cfg.hpfreq, cfg.lpfreq ,cfg.dftfreq(1), cfg.detrend, cfg.demean});
 
 cfg = []; 
 cfg.reref       = 'yes';
@@ -66,7 +50,7 @@ cfg.artfctdef.zvalue.interactive = 'yes';
 Zrem = sum(cfg.artfctdef.zvalue.artifact(:, 2) - cfg.artfctdef.zvalue.artifact(:, 1))/...
     size(pEEG.time{1},2) * 100;
 csv_addCol(env, ID, {'Zval', 'Zart_num', 'Z_rem'}, {cfg.artfctdef.zvalue.cutoff, ...
-    size(cfg.artfctdef.zvalue.artifact,1), Zrem}, dat_ay);
+    size(cfg.artfctdef.zvalue.artifact,1), Zrem});
 %% reject atrifact 
 cfg = []; 
 cfg.artfctdef.reject            = 'nan';
@@ -99,7 +83,7 @@ pEEG_mclean = ft_selectdata(cfg,pEEG_mclean)
 if isempty(man_art); man_art = '--'; end
 Mrem = sum(man_art(:, 2) - man_art(:, 1))/...
     size(pEEG_zclean.time{1},2) * 100;
-csv_addCol(env, ID, {'manual_art_num', 'manual_rem', 'ch_interpolate'}, {size(man_art,1), Mrem, '--'},dat_ay);
+csv_addCol(env, ID, {'manual_art_num', 'manual_rem', 'ch_interpolate'}, {size(man_art,1), Mrem, '--'});
 clear z_artifact Zrem Mrem man_art 
 %% Manual: Remove Channel (by trial or all)
 % Run this cell only if there are channels to remove
