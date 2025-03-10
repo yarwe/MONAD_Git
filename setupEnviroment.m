@@ -48,11 +48,13 @@ if ~exist(exp_folder, 'dir')
     env.paths.manual    = [exp_folder 'manual\'];
     env.paths.art       = [exp_folder 'artifacts\'];
     env.paths.clean     = [exp_folder 'clean\'];
+    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
     % Create the directories
     mkdir(env.paths.auto);
     mkdir(env.paths.manual);
     mkdir(env.paths.art);
     mkdir(env.paths.clean);
+    mkdir(env.paths.ICApng);
 end
 
 % Existing code for handling specific experiments
@@ -63,12 +65,13 @@ if strcmp('OSF_simple', exp)
     env.paths.manual    = [env.paths.preproc 'manual\'];
     env.paths.art       = [env.paths.preproc 'artifacts\'];
     env.paths.clean     = [env.paths.preproc 'clean\'];
+    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
     env.paths.ft_path = ft_path;
 
     
     
     cfg = [];
-    cfg.layout = fullfile([ft_path '\template\layout\EEG1010.lay']);
+    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
     env.lay = ft_prepare_layout(cfg);
 
     env.data.type       = 'bdf';

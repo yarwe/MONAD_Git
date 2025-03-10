@@ -8,7 +8,7 @@ addpath(env.paths.extra_func);
 %% Load single participant
 % skipped ID{1} in the OSF_simple because the ICA didn't converge
 % skipped ID{18} since he was very noisy.
-ID          = env.data.ID{21};
+ID          = env.data.ID{20};
 filename    = [env.paths.raw ID env.data.prefix];
 EEG         = load_data(env, filename);
 csv_init(env, ID);
@@ -16,7 +16,7 @@ csv_init(env, ID);
 clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY TMPEEG tmpEEG filename
 
 %% basic preproc
-cfg             = [];
+cfg            = [];
 cfg.channel     = 'all';  % Do not remove ref1/ref2
 cfg.detrend     = 'yes';
 cfg.continuous  = 'yes';
@@ -96,7 +96,7 @@ clear z_artifact Zrem Mrem man_art
 % A code I built which can fix a channel (based on adjacent channels) in
 % either a specific trial or in all trials. 
 badchannel = {'CP6'};      % insert the bad channel(s) name(s) here
-segment = {38 'lst'};                 % 'all' or trial number to fix channel
+segment = {40 'lst'};                 % 'all' or trial number to fix channel
 
 if ~isempty(badchannel)
     cfg = [];
@@ -122,14 +122,14 @@ if ~isempty(badchannel)
 
         [~, t1] = min(abs(pEEG_mclean.time{1} - segment{1}));
         [~, t2] = min(abs(pEEG_mclean.time{1} - segment{2}));
-        chan_idx = find(strcmp(badchannel, pEEG_mclean.label));
+        chan_idx = find(strcmp(badchannel, pEEG_mclean.label))
         pEEG_mclean.trial{1}(chan_idx,t1:t2) =  tmp.trial{1}(chan_idx,:);
     else
         pEEG_mclean = ft_channelrepair(cfg, pEEG_mclean);
     end
 end
-singleCell = {mat2str(cell2mat(segment))};
-csv_addCol(env, ID, {'ch_interpolate', 'interpolated_sections'}, {badchannel, singleCell});
+
+csv_addCol(env, ID, {'ch_interpolate', 'interpolated_sections'}, {badchannel, segment});
 %% Run ICA
 addpath([env.paths.ft_path 'external\eeglab\']);
 cfg = [];
@@ -150,10 +150,10 @@ saveas(fig, [env.paths.ICApng env.exp '_' ID '_components.png']);
 
 %% reject components
 cfg = [];
-cfg.component = [1];
+cfg.component = [1,2,3];
 dat_after_ICA = ft_rejectcomponent(cfg, comp);
 
-csv_addCol(env, ID, {'ICA_comp'}, {string(cfg.component)});
+csv_addCol(env, ID, {'ICA_comp'}, {strjoin(string(cfg.component), ', ')});
 %% view the data again
 cfg = [];
 cfg.ylim  = [-30 30];

@@ -3,10 +3,17 @@ function [ftEEG] = load_data(env, filename)
     clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
     if strcmp(env.exp, 'OSF_simple') || strcmp(env.exp, 'OSF_complex')
         addpath(genpath(env.paths.eeglab));
-        eeglab; close all
+        eeglab; close all;
         EEG = pop_biosig(filename);
         ftEEG = biosig2ft(EEG);
-        
+        %%
+        var = [];
+        for i=1:100
+            var(:,i) = std(ftEEG.trial{1}(i,:));
+        end
+        find(var<12)
+
+        %%
         ftEEG.label{129} = 'ref1';
         ftEEG.label{130} = 'ref2';
         ftEEG.label{131} = 'eogH1';
@@ -45,8 +52,12 @@ function [ftEEG] = load_data(env, filename)
 
         % Select the channels to keep
         cfg = [];
-        cfg.channel = {env.lay.label{1:64}, 'ref1', 'ref2'};
+        cfg.channel = {ftEEG.label{1:64}, 'ref1', 'ref2'};
         ftEEG = ft_selectdata(cfg, ftEEG);  % Process the data with the selected channels
+        ftEEG2 = ftEEG;
+        ftEEG.label(1:64) = env.lay.label(1:64);
+        %ftEEG.label{65} = 'ref1';
+        %ftEEG.label{66} = 'ref2';
         % append EEG and EOG
         ftEEG = ft_appenddata([],ftEEG, eogH, eogV);
         
