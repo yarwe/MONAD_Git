@@ -1,0 +1,63 @@
+function [LAVI_arr] = dfLAVI_addID(env, subj)
+% Add new data to the LAVI dataset.
+% The dataset contains LAVI results for each ID at each electrode.
+
+addpath(env.paths.LAVI);
+
+% LAVI config
+Lcfg = env.Lcfg;
+
+% Initialize variables
+if strcmp(subj, 'all')
+    all_prev_data = [];
+    n = 1;
+    %N = length(env.data.clean_files);
+    N = 2;
+else
+    all_prev_data = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_df;
+    n = subj{1};
+    N = subj{end};
+end
+
+% EEG structure template
+strct = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {env.Lcfg.foi}, ...
+    'label', {env.lay.label}, 'elec', {env.elec}, 'time', [], 'totaltime', []);
+
+LAVI_arr = {};
+j = 1;
+% Iterate over participants
+for s = n:N
+    file = env.data.clean_files{s};
+    disp(['participant number:' num2str(s)]);
+    EEG = load(file).dat_after_ICA;
+    ID = regexp(file, '([A-Za-z0-9]+)_clean.mat', 'tokens', 'once');
+    strct = struct('ID', ID{1});
+
+    LAVI = zeros(62, length(env.Lcfg.foi));
+    % Calculate LAVI for each electrode
+    for e = 1:62
+        disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
+        LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
+    end
+
+    % Store results
+    strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
+    strct.powspctrm = LAVI;
+end
+LAVI_arr{j} = strct;
+j = j + 1;
+if j == 10 || j==20 || j==30
+    save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+end
+
+% Merge with previous data
+if exist('all_prev_data', 'var')
+    LAVI_arr = [all_prev_data, LAVI_arr];
+end
+
+
+% Save the data
+disp('Saving All Data...');
+save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+%disp('Data saved!');
+end

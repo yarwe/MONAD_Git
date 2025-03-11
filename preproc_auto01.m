@@ -8,7 +8,7 @@ addpath(env.paths.extra_func);
 %% Load single participant
 % skipped ID{1} in the OSF_simple because the ICA didn't converge
 % skipped ID{18} since he was very noisy.
-ID          = env.data.ID{21};
+ID          = env.data.ID{22};
 filename    = [env.paths.raw ID env.data.prefix];
 EEG         = load_data(env, filename);
 csv_init(env, ID);
@@ -95,7 +95,7 @@ clear z_artifact Zrem Mrem man_art
 % Run this cell only if there are channels to remove
 % A code I built which can fix a channel (based on adjacent channels) in
 % either a specific trial or in all trials. 
-badchannel = {'CP6'};      % insert the bad channel(s) name(s) here
+badchannel = {''};      % insert the bad channel(s) name(s) here
 segment = {38 'lst'};                 % 'all' or trial number to fix channel
 
 if ~isempty(badchannel)

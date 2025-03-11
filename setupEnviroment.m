@@ -56,7 +56,7 @@ if ~exist(exp_folder, 'dir')
     mkdir(env.paths.clean);
     mkdir(env.paths.ICApng);
 end
-
+env.paths.maindir = maindir;
 % Existing code for handling specific experiments
 if strcmp('OSF_simple', exp)
     env.paths.raw       = [maindir 'OSF data\Simple\'];
@@ -66,6 +66,7 @@ if strcmp('OSF_simple', exp)
     env.paths.art       = [env.paths.preproc 'artifacts\'];
     env.paths.clean     = [env.paths.preproc 'clean\'];
     env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
+    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
     env.paths.ft_path = ft_path;
 
     
@@ -73,16 +74,23 @@ if strcmp('OSF_simple', exp)
     cfg = [];
     cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
     env.lay = ft_prepare_layout(cfg);
+    env.lay.height = env.lay.height(1:64);
+    env.lay.label  = env.lay.label(1:64);
+    env.lay.pos    = env.lay.pos(1:64,:);
+    env.lay.width  = env.lay.width(1:64);
 
-    env.data.type       = 'bdf';
-    env.data.names      = {dir(fullfile(env.paths.raw, '*.bdf')).name};
-    env.data.ID         = cellfun(@(x) regexprep(x, '_.*', ''), env.data.names, 'UniformOutput', false);
-    env.data.files      = fullfile(env.paths.raw, env.data.names);
-    env.data.prefix     = '_Simpletone.bdf';
-    env.data.linenoise  = 50;
+    env.data.type        = 'bdf';
+    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};
+    env.data.ID          = cellfun(@(x) regexprep(x, '_.*', ''), env.data.names, 'UniformOutput', false);
+    env.data.files       = fullfile(env.paths.raw, env.data.names);
+    env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
+    env.data.clean_files = fullfile(env.paths.clean, env.data.clean_names);
+    env.data.prefix      = '_Simpletone.bdf';
+    env.data.linenoise   = 50;
+    env.data.fsample     = 512;
     
-    env.elec.ref        = [129 130];
-
+    env.elec          = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
+    
 elseif strcmp('OSF_complex', exp)
     env.paths.raw       = [maindir 'OSF data\Complex\'];
     env.paths.preproc   = [preprocDir 'Analysis_Monad\MONAD_preproc\OSF_complex\'];
