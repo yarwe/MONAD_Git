@@ -6,9 +6,12 @@ clc; clear all; close all;
 env = setupEnviroment('OSF_simple');
 addpath(env.paths.extra_func);
 %% Load single participant
-% skipped ID{1} in the OSF_simple because the ICA didn't converge
-% skipped ID{18} since he was very noisy.
-ID          = env.data.ID{22};
+% skipped OSF_simple ID{1} in the OSF_simple because the ICA didn't stop
+% skipped OSF_simple ID{18} since he was very noisy.
+% skipped OSF_simple ID{23} in the OSF_simple because the ICA lrate didn't converge
+% skipped OSF_simple ID{24} in the OSF_simple because the ICA lrate didn't converge
+% skipped OSF_simple ID{25} in the OSF_simple because the ICA didn't stop
+ID          = env.data.ID{32};
 filename    = [env.paths.raw ID env.data.prefix];
 EEG         = load_data(env, filename);
 csv_init(env, ID);
@@ -68,48 +71,49 @@ cfg = [];
 cfg.ylim  = [-30 30];
 man_blocksize = 30;
 cfg.blocksize = man_blocksize;
-man_art = ft_databrowser(cfg,pEEG_zclean)
+man_art = ft_databrowser(cfg,pEEG_zclean);
 
-man_art = man_art.artfctdef.visual.artifact;
-save([env.paths.art ID '_MANartifact'], "man_art");
 %% Manual: Remove Artifacts
 %man_art = load([env.paths.art ID '_MANartifact']);
 %man_art = man_art.man_art;
 cfg = []; 
 cfg.artfctdef.reject           = 'nan';
-cfg.artfctdef.visual.artifact  = man_art;
+cfg.artfctdef.visual.artifact  = man_art.artfctdef.visual.artifact;
 pEEG_mclean = ft_rejectartifact(cfg,pEEG_zclean);
 
 cfg = [];
 cfg.channel = {'all', '-eogV', '-eogH'};
 pEEG_mclean = ft_selectdata(cfg,pEEG_mclean)
 
-
+man_art = man_art.artfctdef.visual.artifact;
 % update csv
 if isempty(man_art); man_art = '--'; end
 Mrem = sum(man_art(:, 2) - man_art(:, 1))/...
     size(pEEG_zclean.time{1},2) * 100;
+
+save([env.paths.art ID '_MANartifact'], "man_art");
 csv_addCol(env, ID, {'manual_art_num', 'manual_rem', 'ch_interpolate', 'interpolated_sections'}, {size(man_art,1), Mrem, '--', '--'});
-clear z_artifact Zrem Mrem man_art 
+clear z_artifact Zrem Mrem 
 %% Manual: Remove Channel (by trial or all)
 % Run this cell only if there are channels to remove
 % A code I built which can fix a channel (based on adjacent channels) in
 % either a specific trial or in all trials. 
 badchannel = {''};      % insert the bad channel(s) name(s) here
-segment = {38 'lst'};                 % 'all' or trial number to fix channel
-
+%seg = {{16 'lst'},{31 'lst'}};                 % 'all' or trial number to fix channel
+seg = {{1,'lst'}};                 % 'all' or trial number to fix channel
 if ~isempty(badchannel)
     cfg = [];
     cfg.layout      = env.lay;
     cfg.method      = 'triangulation';
     neighbours      = ft_prepare_neighbours(cfg, pEEG_mclean);
-    
-    cfg = [];
-    cfg.badchannel  = badchannel;
-    cfg.neighbours  = neighbours;
-    cfg.method      =  'spline';
-    cfg.elec        = ft_read_sens([env.paths.ft_path 'template\electrode\standard_1020.elc']);
-    if ~any(strcmp(segment,'all'))
+
+    for i=1:length(badchannel)
+        cfg = [];
+        cfg.badchannel  = {badchannel{i}};
+        cfg.neighbours  = neighbours;
+        cfg.method      =  'spline';
+        cfg.elec        = ft_read_sens([env.paths.ft_path 'template\electrode\standard_1020.elc']);
+        segment = seg{i};
         if strcmp(segment{2}, 'lst')
             segment{2} = ceil(EEG.time{1}(end)/man_blocksize);
         end
@@ -122,18 +126,24 @@ if ~isempty(badchannel)
 
         [~, t1] = min(abs(pEEG_mclean.time{1} - segment{1}));
         [~, t2] = min(abs(pEEG_mclean.time{1} - segment{2}));
-        chan_idx = find(strcmp(badchannel, pEEG_mclean.label));
+        chan_idx = find(strcmp(badchannel{i}, pEEG_mclean.label));
         pEEG_mclean.trial{1}(chan_idx,t1:t2) =  tmp.trial{1}(chan_idx,:);
-    else
-        pEEG_mclean = ft_channelrepair(cfg, pEEG_mclean);
     end
+else
+    pEEG_mclean = ft_channelrepair(cfg, pEEG_mclean);
 end
-singleCell = {mat2str(cell2mat(segment))};
-csv_addCol(env, ID, {'ch_interpolate', 'interpolated_sections'}, {badchannel, singleCell});
+
+singleCell_seg = cellfun(@mat2str, [seg{:}], 'UniformOutput', false);
+singleCell_seg = {strjoin(singleCell_seg, ',')};
+
+if length(badchannel) > 1; badchannel = {strjoin(badchannel, ', ')}; end
+csv_addCol(env, ID, {'ch_interpolate', 'interpolated_sections'}, {badchannel, singleCell_seg});
+clear singleCell_seg badchannel
 %% Run ICA
 addpath([env.paths.ft_path 'external\eeglab\']);
 cfg = [];
 cfg.method  = 'runica';
+cfg.runica.maxsteps = 100;
 comp = ft_componentanalysis(cfg, pEEG_mclean);
 %% view ICA components
 % view time seriers and topopraphy of ICs
@@ -153,18 +163,21 @@ cfg = [];
 cfg.component = [1];
 dat_after_ICA = ft_rejectcomponent(cfg, comp);
 
-csv_addCol(env, ID, {'ICA_comp'}, {string(cfg.component)});
+comp_idx = {arrayfun(@num2str, cfg.component, 'UniformOutput', false)};
+comp_idx = strjoin(comp_idx{1}, ', ');
+csv_addCol(env, ID, {'ICA_comp'}, {comp_idx});
 %% view the data again
 cfg = [];
 cfg.ylim  = [-30 30];
 cfg.blocksize = 100;
-man_art = ft_databrowser(cfg,dat_after_ICA)
+%man_art2 = ft_databrowser(cfg,pEEG_mclean)
+man_art2 = ft_databrowser(cfg,dat_after_ICA)
 
 %% Manual: Remove Artifacts
 cfg = []; 
 cfg.artfctdef.reject           = 'nan';
-cfg.artfctdef.visual.artifact = man_art.artfctdef.visual.artifact;
-%pEEG_mclean = ft_rejectartifact(cfg,pEEG_mclean);
+cfg.artfctdef.visual.artifact = man_art2.artfctdef.visual.artifact;
+dat_after_ICA2 = ft_rejectartifact(cfg,dat_after_ICA2);
 
 %% save data after preproc
 save([env.paths.clean ID '_clean'], "dat_after_ICA");

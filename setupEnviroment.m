@@ -80,7 +80,7 @@ if strcmp('OSF_simple', exp)
     env.lay.width  = env.lay.width(1:64);
 
     env.data.type        = 'bdf';
-    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};
+    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};    
     env.data.ID          = cellfun(@(x) regexprep(x, '_.*', ''), env.data.names, 'UniformOutput', false);
     env.data.files       = fullfile(env.paths.raw, env.data.names);
     env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};

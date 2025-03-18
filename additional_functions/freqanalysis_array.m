@@ -13,7 +13,7 @@ if strcmp(subj, 'all')
     n = 1;
     N = length(env.data.clean_files);
 else
-    all_prev_data = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_df;
+    all_prev_data = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
     n = subj{1};
     N = subj{end};
 end
@@ -60,13 +60,15 @@ for s = n:N
     fftstrct = ft_freqanalysis(env.Fcfg, EEGtrl_clean);
     fftstrct.num_win = length(EEGtrl.trial);
     fftstrct.rem_win =  fftstrct.num_win - length(cfg.trials);
+    fftstrct.ID = ID;
     fftstrct.cfg.previous = [];
     FFT_arr{j} = fftstrct;
     
     j = j + 1;
 end
 
-if j == 10 || j==20 || j==30
+if mod(j, 10) == 0
+    LAVI_arr = [all_prev_data LAVI_arr];
     save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
     save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
 end
