@@ -11,7 +11,7 @@ addpath(env.paths.extra_func);
 % skipped OSF_simple ID{23} in the OSF_simple because the ICA lrate didn't converge
 % skipped OSF_simple ID{24} in the OSF_simple because the ICA lrate didn't converge
 % skipped OSF_simple ID{25} in the OSF_simple because the ICA didn't stop
-ID          = env.data.ID{32};
+ID          = env.data.ID{33};
 filename    = [env.paths.raw ID env.data.prefix];
 EEG         = load_data(env, filename);
 csv_init(env, ID);
@@ -160,7 +160,7 @@ saveas(fig, [env.paths.ICApng env.exp '_' ID '_components.png']);
 
 %% reject components
 cfg = [];
-cfg.component = [2];
+cfg.component = [1];
 dat_after_ICA = ft_rejectcomponent(cfg, comp);
 
 comp_idx = {arrayfun(@num2str, cfg.component, 'UniformOutput', false)};

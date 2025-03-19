@@ -9,11 +9,13 @@ Lcfg = env.Lcfg;
 
 % Initialize variables
 if strcmp(subj, 'all')
-    all_prev_data = [];
     n = 1;
     N = length(env.data.clean_files);
+    prev_fft_arr = [];
+    prev_LAVI_arr = [];
 else
-    all_prev_data = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
+    prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
+    prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
     n = subj{1};
     N = subj{end};
 end
@@ -34,17 +36,17 @@ for s = n:N
     
     % LAVI analysis
     strct.ID = ID{1};    
-    LAVI = zeros(62, length(env.Lcfg.foi));
-    % Calculate LAVI for each electrode
-    for e = 1:length(EEG.label)
-        disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
-        LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
-    end
-
-    % Store results
-    strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
-    strct.powspctrm = LAVI;
-    LAVI_arr{j} = strct;
+    % LAVI = zeros(62, length(env.Lcfg.foi));
+    % % Calculate LAVI for each electrode
+    % for e = 1:length(EEG.label)
+    %     disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
+    %     LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
+    % end
+    % 
+    % % Store results
+    % strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
+    % strct.powspctrm = LAVI;
+    % LAVI_arr{j} = strct;
 
     
     % FFT analysis
@@ -65,23 +67,26 @@ for s = n:N
     FFT_arr{j} = fftstrct;
     
     j = j + 1;
+
+    if mod(j, 10) == 0
+        %LAVI_arr = [prev_LAVI_arr, LAVI_arr];
+        FFT_arr  = [prev_fft_arr, FFT_arr];
+        %save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+        save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
+    end
 end
 
-if mod(j, 10) == 0
-    LAVI_arr = [all_prev_data LAVI_arr];
-    save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
-    save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
-end
 
 % Merge with previous data
-if exist('all_prev_data', 'var')
-    LAVI_arr = [all_prev_data, LAVI_arr];
+if exist('prev_LAVI_arr', 'var')
+    %LAVI_arr = [prev_LAVI_arr, LAVI_arr];
+    FFT_arr  = [prev_fft_arr, FFT_arr];
 end
 
 
 % Save the data
 disp('Saving All Data...');
-save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+%save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
 save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
 disp('Data saved!');
 end

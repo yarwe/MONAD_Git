@@ -57,6 +57,10 @@ if ~exist(exp_folder, 'dir')
     mkdir(env.paths.ICApng);
 end
 env.paths.maindir = maindir;
+%c = uisetcolor
+env.plots.lineASD = [0.6118    0.8118    0.5843];
+env.plots.lineNT  = [0.4000    0.6667    0.8000];
+
 % Existing code for handling specific experiments
 if strcmp('OSF_simple', exp)
     env.paths.raw       = [maindir 'OSF data\Simple\'];
@@ -88,6 +92,12 @@ if strcmp('OSF_simple', exp)
     env.data.prefix      = '_Simpletone.bdf';
     env.data.linenoise   = 50;
     env.data.fsample     = 512;
+
+    % determine group ('ASD'/'NT'), ASD and Neuro-Typical
+    IDs = erase(env.data.clean_names(:), '_clean.mat');
+    env.data.group_table = table(IDs, replace(extractBefore(IDs, 2), {'A', 'C'}, ...
+        {'ASD', 'NT'}), 'VariableNames', {'ID', 'group'});
+
     
     env.elec          = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
     

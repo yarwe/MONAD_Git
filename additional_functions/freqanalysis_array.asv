@@ -11,10 +11,10 @@ Lcfg = env.Lcfg;
 if strcmp(subj, 'all')
     all_prev_data = [];
     n = 1;
-    %N = length(env.data.clean_files);
-    N = 2;
+    N = length(env.data.clean_files);
 else
-    all_prev_data = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_df;
+    prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
+    prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
     n = subj{1};
     N = subj{end};
 end
@@ -50,39 +50,42 @@ for s = n:N
     
     % FFT analysis
     cfg = [];
-    cfg.length = 20;
+    cfg.length = 15;
     EEGtrl = ft_redefinetrial(cfg,EEG)
     cfg = [];
     cfg.trials = find(~cellfun(@(x) any(isnan(x(:))), EEGtrl.trial));
     % Remove trials with NaNs
     EEGtrl_clean = ft_selectdata(cfg, EEGtrl);
-    fft = {}
-    for i=1:length(EEGtrl_clean)
-        fft{i} = ft_freqanalysis(env.Fcfg, EEGtrl_clean);
-    end
-    FFT_arr{j} = ft_freqgrandaverage([],fft{:});
-    FFT_arr{j}.win    = length(EEGtrl.trial);
-    FFT_arr{j}.remwin = FFT_arr{j}.win - length(cfg.trials);
     
-
-    end
+    fftstrct = [];
+    fftstrct = ft_freqanalysis(env.Fcfg, EEGtrl_clean);
+    fftstrct.num_win = length(EEGtrl.trial);
+    fftstrct.rem_win =  fftstrct.num_win - length(cfg.trials);
+    fftstrct.ID = ID;
+    fftstrct.cfg.previous = [];
+    FFT_arr{j} = fftstrct;
+    
     j = j + 1;
+
+    if mod(j, 10) == 0
+        %LAVI_arr = [prev_LAVI_arr, LAVI_arr];
+        FFT_arr  = [prev_fft_arr, FFT_arr];
+        %save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+        save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
+    end
 end
 
-if j == 10 || j==20 || j==30
-    save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
-    save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
-end
 
 % Merge with previous data
-if exist('all_prev_data', 'var')
-    LAVI_arr = [all_prev_data, LAVI_arr];
+if exist('prev_LAVI_arr', 'var')
+    %LAVI_arr = [prev_LAVI_arr, LAVI_arr];
+    FFT_arr  = [prev_fft_arr, FFT_arr];
 end
 
 
 % Save the data
 disp('Saving All Data...');
-save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+%save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
 save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
 disp('Data saved!');
 end
