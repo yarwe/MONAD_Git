@@ -9,16 +9,25 @@ Lcfg = env.Lcfg;
 
 % Initialize variables
 if strcmp(subj, 'all')
-    n = 1;
-    N = length(env.data.clean_files);
+    IDs = 1:length(env.data.clean_files);
     prev_fft_arr = [];
     prev_LAVI_arr = [];
+
+elseif strcmp(subj,'addall')
+    prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
+    prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
+
+    % find the missing files
+    prev_IDs = cellfun(@(s) s.ID, prev_LAVI_arr, 'UniformOutput', false);
+    clean_IDs = cellfun(@(s) extractBefore(s, '_'), env.data.clean_names, 'UniformOutput', false);
+    IDs = find(~ismember(clean_IDs, prev_IDs));
+
 else
     prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
     prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
-    n = subj{1};
-    N = subj{end};
+    IDs = subj;
 end
+N = length(IDs);
 
 % EEG structure template
 strct = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {env.Lcfg.foi}, ...
@@ -28,25 +37,27 @@ LAVI_arr = {};
 FFT_arr  = {}; 
 j = 1;
 % Iterate over participants
-for s = n:N
-    file = env.data.clean_files{s};
+for s = 1:N
+    k = IDs(s);
+    file = env.data.clean_files{k};
     disp(['participant number:' num2str(s)]);
     EEG = load(file).dat_after_ICA;
+    P = computePinkLAVI([],EEG.trial{1});
     ID = regexp(file, '([A-Za-z0-9]+)_clean.mat', 'tokens', 'once');
     
     % LAVI analysis
     strct.ID = ID{1};    
-    % LAVI = zeros(62, length(env.Lcfg.foi));
-    % % Calculate LAVI for each electrode
-    % for e = 1:length(EEG.label)
-    %     disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
-    %     LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
-    % end
-    % 
-    % % Store results
-    % strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
-    % strct.powspctrm = LAVI;
-    % LAVI_arr{j} = strct;
+    LAVI = zeros(62, length(env.Lcfg.foi));
+    % Calculate LAVI for each electrode
+    for e = 1:length(EEG.label)
+        disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
+        LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
+    end
+
+    % Store results
+    strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
+    strct.powspctrm = LAVI;
+    LAVI_arr{j} = strct;
 
     
     % FFT analysis
