@@ -26,7 +26,7 @@ Fcfg.taper   = 'hanning';
 env.Fcfg = Fcfg;
 
 %% add participants to LAVI/fft arrays
-[LAVI_arr, FFT_arr] = freqanalysis_array(env,'all');
+[LAVI_arr, FFT_arr] = create_datArr(env,'all');
 
 %% load LAVI/fft participant arrays
 LAVI_arr = load([env.paths.preproc 'LAVI_arr']).LAVI_arr;
@@ -63,7 +63,6 @@ fill([foi, flip(foi)], [(ASD_EA.powspctrm), ...
     'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
 
 hold on
-
 p1 = plot(Lcfg.foi, NT_EA.powspctrm, 'LineWidth', 3, 'Color', env.plots.lineNT);
 fill([foi, flip(foi)], [(NT_EA.powspctrm), ...
     (flip(NT_EA.powspctrm+(NT_EA.sd)))],env.plots.lineNT, ...
@@ -86,6 +85,25 @@ axis square;
 
 
 %saveas(gcf, [env.paths.preproc 'LAVI_spectrum.png']);
+%%
+figure; hold on
+p2 = plot(Lcfg.foi, ASD_EA.powspctrm, 'LineWidth', 3, 'Color', env.plots.lineASD);
+fill([foi, flip(foi)], [(ASD_EA.powspctrm), ...
+    (flip(ASD_EA.powspctrm+(ASD_EA.sd)))], env.plots.lineASD, ...
+    'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
+fill([foi, flip(foi)], [(ASD_EA.powspctrm), ...
+    (flip(ASD_EA.powspctrm-(ASD_EA.sd)))], env.plots.lineASD,...
+    'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
+
+
+figure, hold on;
+p1 = plot(Lcfg.foi, NT_EA.powspctrm, 'LineWidth', 3, 'Color', env.plots.lineNT);
+fill([foi, flip(foi)], [(NT_EA.powspctrm), ...
+    (flip(NT_EA.powspctrm+(NT_EA.sd)))],env.plots.lineNT, ...
+    'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
+fill([foi, flip(foi)], [(NT_EA.powspctrm), ...
+    (flip(NT_EA.powspctrm-(NT_EA.sd)))], env.plots.lineNT,...
+    'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
 
 %% plot GA FFT
 figure; hold on;

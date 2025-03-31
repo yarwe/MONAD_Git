@@ -1,5 +1,4 @@
 function [user, dat_ay_letter] = user_func()
-% 'yoel' or 'yarden'
-    user = 'yoel';
-    dat_ay_letter = 'R';
+    user = 'yoel'; % 'yoel' or 'yarden'
+    dat_ay_letter = 'R'; % data ayelet folder letter
 end

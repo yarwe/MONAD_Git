@@ -58,8 +58,8 @@ if ~exist(exp_folder, 'dir')
 end
 env.paths.maindir = maindir;
 %c = uisetcolor
-env.plots.lineASD = [0.6118    0.8118    0.5843];
-env.plots.lineNT  = [0.4000    0.6667    0.8000];
+env.plots.lineASD = [0.4000    0.6667    0.8000];
+env.plots.lineNT  = [0.6118    0.8118    0.5843];
 
 % Existing code for handling specific experiments
 if strcmp('OSF_simple', exp)
