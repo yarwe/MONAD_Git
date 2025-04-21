@@ -16,7 +16,7 @@ addpath(env.paths.extra_func);
 % skipped OSF_simple ID{40} in the OSF_simple because the ICA didn't stop
 % skipped OSF_simple ID{43} in the OSF_simple because the ICA lrate didn't converge
 % skipped OSF_simple ID{44} had wierd topography in ICA
-% skipped OSF_simple ID{45} had wierd topography in ICA
+% % skipped OSF_simple ID{45} had wierd topography in ICA
 % skipped OSF_simple ID{47} had wierd topography in ICA
 % skipped OSF_simple ID{50} in the OSF_simple because the ICA lrate didn't converge
 % skipped OSF_simple ID{52} in the OSF_simple because the ICA lrate didn't converge

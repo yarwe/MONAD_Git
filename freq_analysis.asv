@@ -119,14 +119,12 @@ fill([foi, flip(foi)], [(NT_EA.powspctrm), ...
     'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
 
 %% plot LAVI with noise
-figure;
-ID = 20;
-ch = 'POz';
+ID = 1;
+ch = 'Cz';
 chIdx1 = find(strcmp(ch,env.lay.label))
 chIdx2 = find(strcmp(ch,LAVI_arr{1}.noise.labels))
-maxNoise = max(LAVI_arr{ID}.noise.noise{chIdx2}, [], 1);  % Max across simulations per frequency
-minNoise = min(LAVI_arr{ID}.noise.noise{chIdx2}, [], 1);  % Min across simulations per frequency
-
+maxNoise = max(LAVI_arr{ID}.noise.noise{noiseIdx}, [], 1);  % Max across simulations per frequency
+minNoise = min(LAVI_arr{ID}.noise.noise{noiseIdx}, [], 1);  % Min across simulations per frequency
 plot(Lcfg.foi, LAVI_arr{ID}.powspctrm(chIdx1,:)  , 'LineWidth', 3, 'Color', env.plots.lineASD);
 hold on
 plot(Lcfg.foi, LAVI_arr{ID}.noise.noise{chIdx2});
@@ -134,7 +132,7 @@ hold on
 plot(Lcfg.foi, maxNoise, 'LineWidth', 1.5, 'Color', 'black');
 hold on
 plot(Lcfg.foi, minNoise, 'LineWidth', 1.5, 'Color', 'black');
-ylim([0.32, 0.55])
+
 
 %% plot GA FFT
 figure; hold on;

@@ -161,7 +161,7 @@ elseif strcmp('NMSG', exp)
 
 elseif strcmp('IAASA', exp)
     env.paths.exp       = [maindir 'NIMH data\'];
-    env.paths.raw       = [maindir 'NIMH data\Package_1235552_Influence_of_Attention_and_Aroudal_on_Sensory_Abnormailities_in_ASD\eeg_sub_files01'];
+    env.paths.raw       = [maindir 'NIMH data\Package_1235552_Influence_of_Attention_and_Aroudal_on_Sensory_Abnormailities_in_ASD'];
     env.paths.preproc   = exp_folder;  % Use the dynamically created folder
     env.paths.auto      = [env.paths.preproc 'automated\'];
     env.paths.manual    = [env.paths.preproc 'manual\'];
@@ -171,14 +171,7 @@ elseif strcmp('IAASA', exp)
     env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
     env.paths.ft_path = ft_path;
     
-        
-    cfg = [];
-    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
-    env.lay = ft_prepare_layout(cfg);
-    env.lay.height = env.lay.height(1:64);
-    env.lay.label  = env.lay.label(1:64);
-    env.lay.pos    = env.lay.pos(1:64,:);
-    env.lay.width  = env.lay.width(1:64);
+    env.lay  = load([env.paths.ft_path 'template\layout\GSN-HydroCel-128.mat']);
     env.elec = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
 
     env.data.type        = 'bdf';
@@ -189,7 +182,7 @@ elseif strcmp('IAASA', exp)
     env.data.clean_files = fullfile(env.paths.clean, env.data.clean_names);
     env.data.prefix      = '';
     env.data.linenoise   = 50;
-    env.data.fsample     = 1024;
+    env.data.fsample     = 512;
 
     % determine group ('ASD'/'NT'), ASD and Neuro-Typical
 

@@ -1,7 +1,7 @@
 function [ftEEG] = load_data(env, filename)
     % load data for each data-set
     clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
-    if strcmp(env.exp, 'OSF_simple') || strcmp(env.exp, 'OSF_complex')
+    if strcmp(env.exp, 'OSF_simple')
         addpath(genpath(env.paths.eeglab));
         eeglab; close all;
         EEG = pop_biosig(filename);
@@ -60,6 +60,32 @@ function [ftEEG] = load_data(env, filename)
         %ftEEG.label{66} = 'ref2';
         % append EEG and EOG
         ftEEG = ft_appenddata([],ftEEG, eogH, eogV);
+
+        cfg = []; 
+        cfg.reref       = 'yes';
+        cfg.refchannel  = {'ref1' 'ref2'}; 
+        ftEEG = ft_preprocessing(cfg,ftEEG); 
         
+        cfg = [];
+        cfg.channel = {'all', '-ref1', '-ref2'};
+        ftEEG = ft_selectdata(cfg, ftEEG);
+
+
+       
+    elseif strcmp(env.exp, 'TalKennet')
+        cfg = [];
+        cfg.dataset = filename;
+        ftEEG = ft_preprocessing(cfg);
+
+        %ftEEG.label = env.lay.layout.label(1:length(ftEEG.label));
+
+    elseif strcmp(env.exp, 'NMSG')
+        ftEEG = load(filename);
+
+    elseif strcmp(env.exp, 'IAASA')
+        cfg = [];
+        cfg.dataset = filename;
+        cfg.continuous  = 'yes';
+        ftEEG = ft_preprocessing(cfg);
     end
 end
