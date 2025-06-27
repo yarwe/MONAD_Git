@@ -67,9 +67,9 @@ if strcmp('OSF_simple', exp)
     env.paths.preproc   = exp_folder;  % Use the dynamically created folder
     env.paths.auto      = [env.paths.preproc 'automated\'];
     env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'artifacts\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
+    env.paths.art       = [env.paths.preproc 'new_art\'];
+    env.paths.clean     = [env.paths.preproc 'new_clean\'];
+    env.paths.ICApng    = [env.paths.preproc 'new_ICApng\'];
     env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
     env.paths.ft_path = ft_path;
 
@@ -89,6 +89,7 @@ if strcmp('OSF_simple', exp)
     env.data.files       = fullfile(env.paths.raw, env.data.names);
     env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
     env.data.clean_files = fullfile(env.paths.clean, env.data.clean_names);
+    env.data.clean_nea
     env.data.prefix      = '_Simpletone.bdf';
     env.data.linenoise   = 50;
     env.data.fsample     = 512;

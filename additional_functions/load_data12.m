@@ -60,11 +60,6 @@ function [ftEEG] = load_data(env, filename)
         %ftEEG.label{66} = 'ref2';
         % append EEG and EOG
         ftEEG = ft_appenddata([],ftEEG, eogH, eogV);
-
-        cfg = []; 
-        cfg.reref       = 'yes';
-        cfg.refchannel  = {'ref1' 'ref2'}; 
-        ftEEG = ft_preprocessing(cfg,ftEEG); 
         
         cfg = [];
         cfg.channel = {'all', '-ref1', '-ref2'};
@@ -76,8 +71,9 @@ function [ftEEG] = load_data(env, filename)
         cfg = [];
         cfg.dataset = filename;
         ftEEG = ft_preprocessing(cfg);
+        ftEEG.trial{1} = ftEEG.trial{1} * 1000000; 
 
-        %ftEEG.label = env.lay.layout.label(1:length(ftEEG.label));
+        ftEEG.label = env.lay.label(1:length(ftEEG.label));
 
     elseif strcmp(env.exp, 'NMSG')
         ftEEG = load(filename);

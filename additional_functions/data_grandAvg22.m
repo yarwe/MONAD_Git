@@ -1,4 +1,4 @@
-function [GA_all, GA_elec] = data_grandAvg(cfg,data)
+function [GA_all, GA_elec] = data_grandAvg22(cfg,data)
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 chosen_ch = cfg.channel;
@@ -31,4 +31,18 @@ elseif strcmp(type,'LAVI')
     GA_elec = ft_selectdata(cfg,GA_all);
 end
 
+avgNoise = cell(1, 11);
+for k = 1:11
+    mats = cellfun(@(s) s.noise.noise{k}, data, 'UniformOutput', false);
+    avgNoise{k} = nanmean(cat(3, mats{:}), 3);
 end
+rowMax = cellfun(@(m) max(m, [], 1), avgNoise, 'UniformOutput', false);
+rowMin = cellfun(@(m) min(m, [], 1), avgNoise, 'UniformOutput', false);
+
+GA_all.noise.noise = avgNoise;
+GA_all.noise.max = rowMax;
+GA_all.noise.min = rowMin;
+GA_elec.noise = GA_all.noise;
+
+end
+

@@ -1,0 +1,261 @@
+clc; clear all; close all;
+[env] = setupEnviroment11('OSF_simple');
+addpath(env.paths.LAVI);
+
+%%
+chosen_ch = {'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
+foi = 1:0.5:90;
+
+% set LAVI parameters
+Lcfg = [];
+Lcfg.foi = foi;
+Lcfg.lag = 1.5;
+Lcfg.width = 5;
+Lcfg.fs    = env.data.fsample;
+
+% set fft parameters
+Fcfg = [];
+Fcfg.foi = foi;
+Fcfg.output = 'pow';
+Fcfg.channel = 'all';
+Fcfg.method  = 'mtmfft';
+Fcfg.pad = 'nextpow2';
+Fcfg.taper   = 'hanning';
+
+%% add participants to LAVI/fft arrays
+cfg = [];
+cfg.env = env;
+cfg.Lcfg = Lcfg;
+cfg.Fcfg = Fcfg;
+cfg.prev = 'add'; % add to existing dataframe? 'add' = (add to df), 'all' = run all participants
+[LAVI_arr, FFT_arr] = create_datArr21(cfg);
+
+%% load LAVI/fft participant arrays
+LAVI_arr = load([env.paths.preproc 'LAVI_arr']).LAVI_arr;
+FFT_arr  = load([env.paths.preproc 'FFT_arr']).FFT_arr;
+N = length(env.data.clean_files);
+
+%% find peaks
+cfg = [];
+cfg.env = env;
+cfg.foi = foi;
+for i=1:length(LAVI_arr)
+    data = LAVI_arr{i};
+    pks{i} = LAVI_findPeaks(cfg,data);
+end
+
+
+%% Plot LAVI spectrum
+plot_groups = {'ASD', 'NT', 'SCZ'};  % select groups to plot: ASD
+xfoi = [1, 40];
+noise_var = 1; % whether to plot pink noise
+noiseCh = 'Cz';
+
+
+% Extract IDs and split groups
+IDs = cellfun(@(s) s.ID, LAVI_arr, 'UniformOutput', false);
+all_groups = struct( ...
+    'name', {'ASD', 'NT', 'SCZ'}, ...
+    'label', {'A', 'C', 'S'}, ...
+    'color', {env.plots.lineASD, env.plots.lineNT, env.plots.lineSCZ} ...
+);
+
+% Filter based on plot_groups
+groups = all_groups(ismember({all_groups.name}, plot_groups));
+
+% Load data into groups
+for i = 1:numel(groups)
+    idx = contains(IDs, groups(i).label);
+    groups(i).data = LAVI_arr(idx);
+end
+
+% Grand averages
+cfg = [];
+cfg.channel = chosen_ch;
+cfg.type = 'LAVI';
+
+for i = 1:numel(groups)
+    [groups(i).GA, groups(i).EA] = data_grandAvg22(cfg, groups(i).data);
+end
+
+% Noise index
+noiseChIdx = find(strcmp(noiseCh, groups(1).GA.noise.labels));
+
+% Plot
+close all;
+figure; hold on;
+
+for i = 1:numel(groups)
+    EA = groups(i).EA;
+    GA = groups(i).GA;
+    dat = groups(i).data;
+    clr = groups(i).color;
+
+    % Main plot
+    p(i) = plot(Lcfg.foi, EA.powspctrm, 'LineWidth', 2.5, 'Color', clr);
+
+    % Confidence interval fill
+    N = length(dat);
+    err = EA.sd / sqrt(N);
+    fill([foi, flip(foi)], [EA.powspctrm, flip(EA.powspctrm + err)], ...
+         clr, 'FaceAlpha', 0.15, 'EdgeAlpha', 0.5);
+    fill([foi, flip(foi)], [EA.powspctrm, flip(EA.powspctrm - err)], ...
+         clr, 'FaceAlpha', 0.15, 'EdgeAlpha', 0.5);
+
+    % Noise line
+    if noise_var == 1
+        plot(Lcfg.foi, GA.noise.noise{noiseChIdx}, ...
+            'HandleVisibility', 'off', 'Color', [1, 0, 0]);
+    end
+    h_noise = plot(nan, nan, 'Color', [1, 0, 0], 'LineWidth', 2);
+end
+
+% Optional: plot max/min noise across all shown groups
+if noise_var == 1
+    % Get only noise vectors for groups being plotted
+    allNoise = [];
+    for i = 2:numel(groups)
+        allNoise = cat(3, allNoise, groups(i).GA.noise.noise{noiseChIdx});
+    end
+    maxNoise = max(squeeze(max(allNoise, [], 1)), [], 2)';
+    minNoise = min(squeeze(min(allNoise, [], 1)), [], 2)';
+    plot(Lcfg.foi, maxNoise, 'HandleVisibility', 'off', 'Color', [0 0 0], 'LineWidth', 1.2);
+    plot(Lcfg.foi, minNoise, 'HandleVisibility', 'off', 'Color', [0 0 0], 'LineWidth', 1.2);
+end
+
+% Final plot settings
+title({['LAVI Spectrum'], ['Electrodes: ', strjoin(chosen_ch, ', ')] ...
+    ['Pink Noise Electrode: ' noiseCh]}, 'FontSize', 12);
+xlabel('Frequency');
+ylabel('LAVI');
+ylim([0.23, 0.64]);
+
+% manipulate x axis and and fit logarithmic spaced axis
+set(gca, 'XScale', 'log');
+xlim([xfoi(1), xfoi(end)]);
+xt = logspace(log10(xfoi(1)), log10(xfoi(2)), 12);
+xt = round(xt, 1);  % round to 1 decimal place
+xticks(xt);
+xticklabels(string(xt));
+xtickangle(0)
+
+legend([p, h_noise], ...
+       [arrayfun(@(g) sprintf('%s, N=%d', g.name, length(g.data)),...
+       groups, 'UniformOutput', false), ...
+        {'Pink Noise'}], ...
+       'Location', 'northwest');
+axis square;
+
+exportgraphics(gcf, [env.paths.preproc 'GA_LAVI_Wnoise2.png'], ...
+    'Resolution', 400, ...
+    'ContentType', 'image', ...
+    'BackgroundColor', 'white');
+
+saveas(gcf, [env.paths.preproc 'GA_LAVI_Wnoise.png']);
+
+
+%% plot LAVI with noise
+figure;
+ID = 20;
+ch = 'POz';
+chIdx1 = find(strcmp(ch,env.lay.label))
+chIdx2 = find(strcmp(ch,LAVI_arr{1}.noise.labels))
+maxNoise = max(LAVI_arr{ID}.noise.noise{chIdx2}, [], 1);  % Max across simulations per frequency
+minNoise = min(LAVI_arr{ID}.noise.noise{chIdx2}, [], 1);  % Min across simulations per frequency
+
+plot(Lcfg.foi, LAVI_arr{ID}.powspctrm(chIdx1,:)  , 'LineWidth', 3, 'Color', env.plots.lineASD);
+hold on
+plot(Lcfg.foi, LAVI_arr{ID}.noise.noise{chIdx2});
+hold on
+plot(Lcfg.foi, maxNoise, 'LineWidth', 1.5, 'Color', 'black');
+hold on
+plot(Lcfg.foi, minNoise, 'LineWidth', 1.5, 'Color', 'black');
+ylim([0.32, 0.55])
+
+%% plot GA FFT
+figure; hold on;
+lineC = [0.0745, 0.6235, 1];
+xlim([foi(1), foi(end)]);
+plot(Fcfg.foi,fft_EA.powspctrm,'LineWidth', 3);
+fill([Fcfg.foi, flip(Fcfg.foi)], [(fft_EA.powspctrm), ...
+    flip((fft_EA.powspctrm+fft_EA.sd))],lineC, ...
+    'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
+fill([Fcfg.foi, flip(Fcfg.foi)], [(fft_EA.powspctrm), ...
+    flip((fft_EA.powspctrm -fft_EA.sd))],lineC, ...
+    'FaceAlpha', 0.2, 'EdgeAlpha', 0.8);
+title({['fft spectrum, N=', num2str(N)], ...
+    ['electrodes: ', strjoin(chosen_ch, ', ')]}, 'FontSize', 12);
+set(gca, 'XScale', 'log');  % Set logarithmic x-axis
+xticks([foi(1:5:end) foi(end)]);  
+xticklabels([string(round(foi(1:5:end),1)) foi(end)]);  
+ylabel('log power')
+axis square
+saveas(gcf, [env.paths.preproc 'fft_spectrum.png']);
+
+
+%% show neighbours - delete
+j = 1;
+% find representative electrodes
+cfg = [];
+cfg.layout = env.lay;
+cfg.compress = 'yes';
+cfg.method = 'triangulation';
+cfg.feedback = 'yes';
+neighbours = ft_prepare_neighbours(cfg);
+%% add noise to previous array - now its in the create_datArr function so delete when not needed
+if length(env.lay.label) == 64
+    idx = find(cellfun(@(x) numel(x)==8, {neighbours.neighblabel}));
+else
+    idx = find(cellfun(@(x) numel(x)==16, {neighbours.neighblabel}));
+end
+neigh_labels = {neighbours.label};
+neigh_labels = {neigh_labels{idx}};
+
+
+
+
+x = LAVI_arr;
+LAVI_arr_wNoise = {};
+IDs = 1:length(env.data.clean_files);
+for s = 1:N
+    k = IDs(s);
+    file = env.data.clean_files{k};
+    disp(['participant number:' num2str(s)]);
+    EEG = load(file).dat_after_ICA;
+    ID = regexp(file, '([A-Za-z0-9]+)_clean.mat', 'tokens', 'once');
+    
+    noise_labels = {};
+    noise        = {};
+
+    % LAVI analysis
+    strct.ID = ID{1};    
+    % Calculate LAVI for each electrode
+    for e = 1:length(EEG.label)
+        disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
+        %LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
+        if ismember(EEG.label{e}, neigh_labels)
+            Ncfg = [];
+            Ncfg.foi = Lcfg.foi;
+            Ncfg.fs = env.data.fsample;
+            Ncfg.Pink_reps = 20;
+            NoiseSim = computePinkLAVI(Ncfg,EEG.trial{1}(e,:));
+            noise_labels{end+1} = EEG.label{e};
+            noise{end+1}        = NoiseSim;
+        end
+    end
+
+    % Store results
+    % noise struct
+    noiseStrct        = [];
+    noiseStrct.noise  = noise;
+    noiseStrct.labels = noise_labels;
+    noiseStrct.fs     = Ncfg.fs;
+    noiseStrct.simNum = Ncfg.Pink_reps;
+
+    strct = x{s};
+    strct.noise = noiseStrct;
+    LAVI_arr_wNoise{j} = strct;
+
+    j = j + 1;
+end
+

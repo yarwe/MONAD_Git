@@ -1,8 +1,12 @@
 function [LAVI_arr, FFT_arr] = freqanalysis_array(cfg, subj)
 % Add new data to the LAVI dataset.
 % The dataset contains LAVI results for each ID at each electrode.
-
 env = cfg.env;
+
+cur_elecs = {'Fz' 'Cz' 'Pz' 'Oz' 'C3' 'C4' 'F4' 'F3' 'P4' 'P3'};
+[~, elecIdx] = ismember(cur_elecs, env.lay.label);
+noise_elecs = {'Cz', 'Fz' 'POz'};
+
 addpath(env.paths.LAVI);
 
 % LAVI and fft config
@@ -41,6 +45,7 @@ elseif strcmp(subj,'addall')
     IDs = find(~ismember(clean_IDs, prev_IDs));
 
 else
+    warning('Are you sure you dont want all or addall?')
     prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
     prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
     IDs = subj;
@@ -71,14 +76,15 @@ for s = 1:N
     strct.ID = ID{1};    
     LAVI = zeros(62, length(Lcfg.foi));
     % Calculate LAVI for each electrode
-    for e = 1:length(EEG.label)
+    for e = 1:length(elecIdx)
+        elc = elecIdx(e);
         disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
-        LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
-        if ismember(EEG.label{e}, neigh_labels)
+        LAVI(elc,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(elc,:));
+        if ismember(EEG.label{elc}, noise_elecs)
             Ncfg = [];
             Ncfg.foi = Lcfg.foi;
             Ncfg.fs = env.data.fsample;
-            Ncfg.Pink_reps = 10;
+            Ncfg.Pink_reps = 2;
             NoiseSim = computePinkLAVI(Ncfg,EEG.trial{1}(e,:));
             noise_labels{end+1} = EEG.label{e};
             noise{end+1}        = NoiseSim;
@@ -98,31 +104,14 @@ for s = 1:N
     strct.noise     = noiseStrct;
     LAVI_arr{j} = strct;
 
-    
-    % FFT analysis
-    cfg = [];
-    cfg.length = 15;
-    EEGtrl = ft_redefinetrial(cfg,EEG)
-    cfg = [];
-    cfg.trials = find(~cellfun(@(x) any(isnan(x(:))), EEGtrl.trial));
-    % Remove trials with NaNs
-    EEGtrl_clean = ft_selectdata(cfg, EEGtrl);
-    
-    fftstrct = [];
-    fftstrct = ft_freqanalysis(Fcfg, EEGtrl_clean);
-    fftstrct.num_win = length(EEGtrl.trial);
-    fftstrct.rem_win =  fftstrct.num_win - length(cfg.trials);
-    fftstrct.ID = ID;
-    fftstrct.cfg.previous = [];
-    FFT_arr{j} = fftstrct;
-    
+
     j = j + 1;
 
     if mod(j, 10) == 0
         LAVI_arr = [prev_LAVI_arr, LAVI_arr];
-        FFT_arr  = [prev_fft_arr, FFT_arr];
-        save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
-        save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
+        %FFT_arr  = [prev_fft_arr, FFT_arr];
+        save([env.paths.preproc num2str(j) '_LAVI_arr_new'], 'LAVI_arr', '-v7.3', '-nocompression');
+        %save([env.paths.preproc 'FFT_arr_new'], 'FFT_arr', '-v7.3', '-nocompression');
     end
 end
 
@@ -136,8 +125,8 @@ end
 
 % Save the data
 disp('Saving All Data...');
-save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
-save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
+save([env.paths.preproc 'LAVI_arr_new'], 'LAVI_arr', '-v7.3', '-nocompression');
+save([env.paths.preproc 'FFT_arr_new'], 'FFT_arr', '-v7.3', '-nocompression');
 disp('Data saved!');
 
 

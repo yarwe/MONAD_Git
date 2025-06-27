@@ -1,6 +1,13 @@
-function [LAVI_arr, FFT_arr] = freqanalysis_array(cfg, subj)
+function [LAVI_arr, FFT_arr] = create_datArr21(cfg)
 % Add new data to the LAVI dataset.
 % The dataset contains LAVI results for each ID at each electrode.
+%
+% cfg.env:  the enviroment loaded from setupEnviroment11.
+% cfg.Lcfg: LAVI cfg, containing the LAVI calculation variables.
+% cfg.Fcfg: FFT cfg, containing the FFT calculation variables.
+% cfg.prev: 'add'/'all'. whether to add the data to an existing previous
+% dataframe or create a new dataframe and calculate across all
+% participants.
 
 env = cfg.env;
 addpath(env.paths.LAVI);
@@ -8,6 +15,7 @@ addpath(env.paths.LAVI);
 % LAVI and fft config
 Lcfg = cfg.Lcfg;
 Fcfg = cfg.Fcfg;
+prev = cfg.prev;
 
 % find representative electrodes
 cfg = [];
@@ -24,50 +32,68 @@ end
 neigh_labels = {neighbours.label};
 neigh_labels = {neigh_labels{idx}};
 
+% Initialize variables and load previous data if needed
+if strcmp(prev, 'add')
+    % load LAVI df
+    fileList = dir(fullfile(env.paths.preproc, '*LAVI*.mat'));
+    prevLAVI = load(fullfile(env.paths.preproc, fileList(1).name));
+    fieldName = fieldnames(prevLAVI);
+    LAVI_arr = prevLAVI.(fieldName{1});
+    
+    % load fft df
+    fileList  = dir(fullfile(env.paths.preproc, '*fft*.mat'));
+    prevFFT   = load(fullfile(env.paths.preproc, fileList(1).name));
+    fieldName = fieldnames(prevFFT);
+    FFT_arr   = prevFFT.(fieldName{1});
 
-% Initialize variables
-if strcmp(subj, 'all')
-    IDs = 1:length(env.data.clean_files);
-    prev_fft_arr = [];
-    prev_LAVI_arr = [];
+    % find the IDs of the previously processed data
+    prevIDs = cellfun(@(s) s.ID, LAVI_arr, 'UniformOutput', false);
 
-elseif strcmp(subj,'addall')
-    prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
-    prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
-
-    % find the missing files
-    prev_IDs = cellfun(@(s) s.ID, prev_LAVI_arr, 'UniformOutput', false);
-    clean_IDs = cellfun(@(s) extractBefore(s, '_'), env.data.clean_names, 'UniformOutput', false);
-    IDs = find(~ismember(clean_IDs, prev_IDs));
-
+elseif strcmp(cfg.prev, 'all')
+    LAVI_arr = {};
+    FFT_arr  = {}; 
+    prevIDs  = [];
 else
-    prev_LAVI_arr = load([env.paths.preproc 'LAVI_arr.mat']).LAVI_arr;
-    prev_fft_arr = load([env.paths.preproc 'FFT_arr.mat']).FFT_arr;
-    IDs = subj;
+    error('add to a previous data frame or start over?');
 end
-N = length(IDs);
+
+N = length(env.data.clean_files);
 
 % EEG structure template
 strct = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {Lcfg.foi}, ...
     'label', {env.lay.label(1:64)}, 'elec', {env.elec}, 'time', []);
-
-LAVI_arr = {};
-FFT_arr  = {}; 
-j = 1;
+counter = 0;
 % Iterate over participants
 for s = 1:N
-    k = IDs(s);
-    file = env.data.clean_files{k};
+    file = env.data.clean_files{s};
+    ID = regexp(file, '([A-Za-z0-9]+)_clean.mat', 'tokens', 'once');
+    if ismember(ID, prevIDs)
+        continue;
+    end
     disp(['participant number:' num2str(s)]);
+    
+    % load file and extract the struct
     tmp = load(file);
     fieldName = fieldnames(tmp);
-    EEG = tmp.(fieldName{1});
-    ID = regexp(file, '([A-Za-z0-9]+)_clean.mat', 'tokens', 'once');
+    try
+        EEG = tmp.(fieldName{1}){1};
+    catch
+        EEG = tmp.(fieldName{1});
+    end
+
+    % check if there are accidentaly EOG channels
+    sz = size(EEG.trial{1});
+    if sz(1) > 64
+        cfg = [];
+        cfg.channel = 1:64;
+        EEG = ft_selectdata(cfg,EEG);
+    end
     
+    % initiate noise variables
     noise_labels = {};
     noise        = {};
 
-    % LAVI analysis
+    % LAVI analysis %
     strct.ID = ID{1};    
     LAVI = zeros(62, length(Lcfg.foi));
     % Calculate LAVI for each electrode
@@ -78,14 +104,14 @@ for s = 1:N
             Ncfg = [];
             Ncfg.foi = Lcfg.foi;
             Ncfg.fs = env.data.fsample;
-            Ncfg.Pink_reps = 10;
+            Ncfg.Pink_reps = 20;
             NoiseSim = computePinkLAVI(Ncfg,EEG.trial{1}(e,:));
             noise_labels{end+1} = EEG.label{e};
             noise{end+1}        = NoiseSim;
         end
     end
 
-    % Store results
+    % store LAVI results %
     % noise struct
     noiseStrct        = [];
     noiseStrct.noise  = noise;
@@ -96,10 +122,10 @@ for s = 1:N
     strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
     strct.powspctrm = LAVI;
     strct.noise     = noiseStrct;
-    LAVI_arr{j} = strct;
+    LAVI_arr{end+1} = strct;
 
     
-    % FFT analysis
+    % FFT analysis %
     cfg = [];
     cfg.length = 15;
     EEGtrl = ft_redefinetrial(cfg,EEG)
@@ -114,23 +140,14 @@ for s = 1:N
     fftstrct.rem_win =  fftstrct.num_win - length(cfg.trials);
     fftstrct.ID = ID;
     fftstrct.cfg.previous = [];
-    FFT_arr{j} = fftstrct;
+    FFT_arr{end+1} = fftstrct;
     
-    j = j + 1;
+    counter = counter + 1;
 
-    if mod(j, 10) == 0
-        LAVI_arr = [prev_LAVI_arr, LAVI_arr];
-        FFT_arr  = [prev_fft_arr, FFT_arr];
-        save([env.paths.preproc 'LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
-        save([env.paths.preproc 'FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
+    if mod(counter, 5) == 0
+        save([env.paths.preproc num2str(length(LAVI_arr)) '_LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
+        save([env.paths.preproc num2str(length(FFT_arr)) '_FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
     end
-end
-
-
-% Merge with previous data
-if exist('prev_LAVI_arr', 'var')
-    LAVI_arr = [prev_LAVI_arr, LAVI_arr];
-    FFT_arr  = [prev_fft_arr, FFT_arr];
 end
 
 
