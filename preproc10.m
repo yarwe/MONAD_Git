@@ -9,9 +9,6 @@ clc; clear all; close all;
 env = setupEnviroment11('TalKennet');
 addpath(env.paths.extra_func);
 
-% initialize cell array to save multiple datasets at the same time.
-all_data = [];
-j = 0;
 %% Load single participant
 clc;
 s = 2; % participant number to load
