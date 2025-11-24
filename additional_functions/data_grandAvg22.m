@@ -1,4 +1,4 @@
-function [GA_all, GA_elec] = data_grandAvg22(cfg,data)
+function [grandAvg] = data_grandAvg22(cfg,data)
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 chosen_ch = cfg.channel;
@@ -9,15 +9,14 @@ cfg.channel     = chosen_ch;
 cfg.avgoverchan = 'yes';
 cfg.nanmean     = 'yes';
 
-if strcmp(type, 'fft')
+if strcmp(type, 'powspctrm')
     % average FFT over participants
     cfg2 = [];
     cfg2.keepindividual = 'yes';
-    GA_all = ft_freqgrandaverage(cfg2, data{:});
-    GA_all.sd = log10(squeeze(std(GA_all.powspctrm,1)));
-    GA_all.powspctrm = log10(squeeze(mean(GA_all.powspctrm,1)));
-
-    GA_elec  = ft_selectdata(cfg,GA_elec);
+    grandAvg = ft_freqgrandaverage(cfg2, data{:});
+    grandAvg.sd = log10(squeeze(std(grandAvg.powspctrm,1)));
+    grandAvg.powspctrm = log10(squeeze(mean(grandAvg.powspctrm,1)));
+    grandAvg.ID = 'grandAvg';
 
 elseif strcmp(type,'LAVI')
     % average LAVI over participants
@@ -26,23 +25,20 @@ elseif strcmp(type,'LAVI')
     allCels = cat(3, allCels{:});
     strct.powspctrm = nanmean(allCels, 3);
     strct.sd = nanstd(allCels, 0, 3);
-    GA_all = strct;
+    grandAvg = strct;
 
-    GA_elec = ft_selectdata(cfg,GA_all);
+    avgNoise = cell(1, 11);
+    for k = 1:11
+        mats = cellfun(@(s) s.noise.noise{k}, data, 'UniformOutput', false);
+        avgNoise{k} = nanmean(cat(3, mats{:}), 3);
+    end
+    rowMax = cellfun(@(m) max(m, [], 1), avgNoise, 'UniformOutput', false);
+    rowMin = cellfun(@(m) min(m, [], 1), avgNoise, 'UniformOutput', false);
+
+    grandAvg.noise.noise = avgNoise;
+    grandAvg.noise.max = rowMax;
+    grandAvg.noise.min = rowMin;
+    grandAvg.ID = 'grandAvg';
 end
-
-avgNoise = cell(1, 11);
-for k = 1:11
-    mats = cellfun(@(s) s.noise.noise{k}, data, 'UniformOutput', false);
-    avgNoise{k} = nanmean(cat(3, mats{:}), 3);
-end
-rowMax = cellfun(@(m) max(m, [], 1), avgNoise, 'UniformOutput', false);
-rowMin = cellfun(@(m) min(m, [], 1), avgNoise, 'UniformOutput', false);
-
-GA_all.noise.noise = avgNoise;
-GA_all.noise.max = rowMax;
-GA_all.noise.min = rowMin;
-GA_elec.noise = GA_all.noise;
-
 end
 

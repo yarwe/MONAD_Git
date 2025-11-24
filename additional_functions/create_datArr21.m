@@ -49,7 +49,7 @@ if strcmp(prev, 'add')
     % find the IDs of the previously processed data
     prevIDs = cellfun(@(s) s.ID, LAVI_arr, 'UniformOutput', false);
 
-elseif strcmp(cfg.prev, 'all')
+elseif strcmp(prev, 'all')
     LAVI_arr = {};
     FFT_arr  = {}; 
     prevIDs  = [];

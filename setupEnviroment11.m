@@ -1,5 +1,6 @@
 function [env] = setupEnvironment(exp)
-
+% 'OSF_simple', 'TalKennet', 'NMSG' (Neural Markers of Shared Gaze...)
+% 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 % List of possible experiment names
 experiments = {'OSF_simple', 'TalKennet', 'NMSG', 'IAASA'};
 % Check if the provided experiment name exists in the list
