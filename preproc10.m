@@ -1,7 +1,10 @@
 %% Clear all 
-cd('C:\Users\yoelgo\Documents\GitHub\MONAD_Git');
-%cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
+% cd('C:\Users\yoelgo\Documents\GitHub\MONAD_Git');
+% cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
 clc; clear all; close all;
+%%
+addpath("additional_functions")
+addpath("analysis_MONAD\MONAD_preproc\OSF_simple\new_clean\")
 %% load enviroment according to the experiment
 % experiment names: 
 % 'OSF_simple', 'TalKennet',

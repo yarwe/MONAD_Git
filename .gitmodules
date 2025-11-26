@@ -1,0 +1,3 @@
+[submodule "Superlets"]
+	path = Superlets
+	url = https://github.com/TransylvanianInstituteOfNeuroscience/Superlets.git
