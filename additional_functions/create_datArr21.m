@@ -52,7 +52,7 @@ if strcmp(prev, 'add')
 elseif strcmp(prev, 'all')
     LAVI_arr = {};
     FFT_arr  = {}; 
-    prevIDs  = [];
+    prevIDs  = {};
 else
     error('add to a previous data frame or start over?');
 end

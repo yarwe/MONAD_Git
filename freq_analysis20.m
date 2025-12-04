@@ -39,7 +39,7 @@ cfg = [];
 cfg.env = env;
 cfg.Lcfg = Lcfg;
 cfg.Fcfg = Fcfg;
-cfg.prev = 'all'; % add to existing dataframe? 'add' = (add to df), 'all' = run all participants
+cfg.prev = 'add'; % add to existing dataframe? 'add' = (add to df), 'all' = run all participants
 [LAVI_arr, FFT_arr] = create_datArr21(cfg);
 
 %% load LAVI/fft participant arrays
