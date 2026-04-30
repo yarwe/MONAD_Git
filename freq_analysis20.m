@@ -1,10 +1,13 @@
 clc; clear all; close all;
-[env] = setupEnviroment11('OSF_simple');
+% experiment names: 
+% 'OSF_simple', 'TalKennet',
+% 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
+[env] = setupEnviroment11('TalKennet');
 addpath(env.paths.LAVI);
 
 % set parameters for LAVI and FFT
-chosen_ch = {'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
-foi = 1:0.5:90;
+chosen_ch = { 'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
+foi = 1:0.5:90; %
 
 % set LAVI parameters
 Lcfg = [];
@@ -39,7 +42,7 @@ cfg = [];
 cfg.env = env;
 cfg.Lcfg = Lcfg;
 cfg.Fcfg = Fcfg;
-cfg.prev = 'add'; % add to existing dataframe? 'add' = (add to df), 'all' = run all participants
+cfg.prev = 'all'; % add to existing dataframe? 'add' = (add to df), 'all' = run all participants
 [LAVI_arr, FFT_arr] = create_datArr21(cfg);
 
 %% load LAVI/fft participant arrays
@@ -127,7 +130,7 @@ noise_var = 1;       % Only used when dependant_variable = 'LAVI'
 noiseCh = 'Cz';
 
 % foi
-xfoi = [1, 40];
+xfoi = [1, 90];
 FOI = Lcfg.foi;
 
 % Find noise channel index (only needed for LAVI)

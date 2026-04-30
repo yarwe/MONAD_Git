@@ -1,5 +1,5 @@
 function csv_init(env, ID)
-    if ~exist('env.dat_ay','var')
+    if ~isfield(env, 'dat_ay')
         logFile = 'R:\Yarden\MONAD_log.csv';
     else
         logFile = [env.dat_ay ':\Yarden\MONAD_log.csv'];
@@ -16,8 +16,11 @@ function csv_init(env, ID)
         
         % Check if the 'ID' already exists.
         if any(dataTable.ID == ID) & any(dataTable.exp == env.exp) 
-            warning('ID "%s" already exists in the log file.', ID);
-            return;
+                rerun = input('Data already cleaned. Add rerun to csv log file? Press 1 for yes, 0 to no. ');
+                    if ~rerun
+                        warning('ID "%s" already exists in the log file.', ID);
+                        return;
+                    end
         end
         
         % Add a new row with placeholders for other columns.

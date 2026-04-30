@@ -2,6 +2,9 @@
 % cd('C:\Users\yoelgo\Documents\GitHub\MONAD_Git');
 % cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
 clc; clear all; close all;
+main_monad_git_folder = input('What is the path of MONAD_Git folder? ', 's');
+cd(main_monad_git_folder)
+
 %%
 addpath("additional_functions")
 addpath("analysis_MONAD\MONAD_preproc\OSF_simple\new_clean\")
@@ -9,19 +12,22 @@ addpath("analysis_MONAD\MONAD_preproc\OSF_simple\new_clean\")
 % experiment names: 
 % 'OSF_simple', 'TalKennet',
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
-env = setupEnviroment11('TalKennet');
+env = setupEnviroment11('OSF_simple');
 addpath(env.paths.extra_func);
 
 %% Load single participant
 clc;
-s = 2; % participant number to load
+s = 1; % participant number to load
 
 ID          = env.data.ID{s}; 
 disp(ID);
 
 % check if there is already clean data of that ID
 if contains(ID, env.data.clean_names) %|| any(contains(all_data(2,:), env.data.clean_names))
-    error([ID ' Data already cleaned'])
+    rerun = input('Data already cleaned. Rerun pre-processing? Press 1 for yes, 0 to exit. ');
+    if ~rerun
+        error([ID ' Data already cleaned: Stopped running script'])
+    end
 end
 
 filename    = env.data.files{s};
@@ -31,10 +37,47 @@ EEG         = load_data12(env, filename);
 csv_init15(env, ID);
 
 % clean previous data to not create confusions
-clear pEEG_zclean pEEG_mcleanCh pEEG pEEG_mclean EEG man_art2 man_art comp badCh Mart dat_after_ICA
-% clear wierd stuff that comes when you load EEGlab data
-clear s ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY TMPEEG tmpEEG filename
+clear pEEG_zclean pEEG_mcleanCh pEEG pEEG_mclean man_art2 man_art comp badCh Mart dat_after_ICA
+% clear weird stuff that comes when you load EEGlab data
+clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY TMPEEG tmpEEG filename
 
+%% Look at raw data before doing anything
+fs = EEG.fsample; % Get sampling frequnecy
+
+cfg = [];
+cfg.demean      = 'yes';
+cfg.detrend     = 'yes';
+cfg.viewmode = 'vertical'; % Or 'butterfly' for overlaid channels
+cfg.position = [1 41 1680 933];
+% cfg.ylim = 'maxmin'; % Automatically fit all channels' data into the y-axis range
+cfg.ylim = [-3 3]; % Replace with appropriate min and max values for your data
+ft_databrowser(cfg, EEG);
+
+% % Power spectrum
+
+% Channels where the line noise is most visible
+
+% Check and  get indices only if there are such channels in the current
+% data
+
+% Plot
+% pw_raw_all = zeros(,length(EEG.)) % save power spectrum of raw data
+chosen_chans=1:66;
+for chan=chosen_chans
+    [ps_raw, frq] = pwelch(EEG.trial{1}(chan,:),2*fs,[],[],fs);
+    figure; 
+    plot(frq,ps_raw,'k');
+    set(gca,'FontSize',14,'XScale','log','YScale','log');
+    ylabel(sprintf('Power spectrum of %s',EEG.label{chan}));
+    title(sprintf('Subject %d',s));
+    xlim('tight')
+end
+
+% Overlayed- all channels
+
+
+
+%%
 % basic preproc
 cfg             = [];
 cfg.demean      = 'yes';
@@ -42,7 +85,7 @@ cfg.detrend     = 'yes';
 cfg.reref       = 'yes';
 cfg.refchannel  = 'all';
 
-% Band-pass filter: 1–200 Hz
+% Band-pass filter: 0.5–200 Hz
 cfg.bpfilter    = 'yes';
 cfg.bpfreq      = [0.5 200];
 cfg.bpfilttype  = 'but';

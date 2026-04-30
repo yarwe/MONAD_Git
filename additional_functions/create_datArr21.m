@@ -30,7 +30,7 @@ else
     idx = find(cellfun(@(x) numel(x)==16, {neighbours.neighblabel}));
 end
 neigh_labels = {neighbours.label};
-neigh_labels = {neigh_labels{idx}};
+neigh_labels = {neigh_labels(idx)};
 
 % Initialize variables and load previous data if needed
 if strcmp(prev, 'add')
@@ -80,6 +80,8 @@ for s = 1:N
     catch
         EEG = tmp.(fieldName{1});
     end
+    
+    %%%%%% FIX THIS (!!)- numbers are not the only indicators for EOG/EEG types %%%%%%
 
     % check if there are accidentaly EOG channels
     sz = size(EEG.trial{1});
@@ -88,7 +90,8 @@ for s = 1:N
         cfg.channel = 1:64;
         EEG = ft_selectdata(cfg,EEG);
     end
-    
+    %%%%%%
+
     % initiate noise variables
     noise_labels = {};
     noise        = {};
@@ -96,15 +99,17 @@ for s = 1:N
     % LAVI analysis %
     strct.ID = ID{1};    
     LAVI = zeros(62, length(Lcfg.foi));
+    n_pink_rep=20;
+    samp_rate=env.data.fsample;
     % Calculate LAVI for each electrode
     for e = 1:length(EEG.label)
         disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
         LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
-        if ismember(EEG.label{e}, neigh_labels)
+        if ismember(EEG.label{e}, neigh_labels{1})
             Ncfg = [];
             Ncfg.foi = Lcfg.foi;
-            Ncfg.fs = env.data.fsample;
-            Ncfg.Pink_reps = 20;
+            Ncfg.fs = samp_rate;
+            Ncfg.Pink_reps = n_pink_rep;
             NoiseSim = computePinkLAVI(Ncfg,EEG.trial{1}(e,:));
             noise_labels{end+1} = EEG.label{e};
             noise{end+1}        = NoiseSim;
@@ -116,8 +121,8 @@ for s = 1:N
     noiseStrct        = [];
     noiseStrct.noise  = noise;
     noiseStrct.labels = noise_labels;
-    noiseStrct.fs     = Ncfg.fs;
-    noiseStrct.simNum = Ncfg.Pink_reps;
+    noiseStrct.fs     = samp_rate;
+    noiseStrct.simNum = n_pink_rep;
 
     strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
     strct.powspctrm = LAVI;
@@ -128,7 +133,7 @@ for s = 1:N
     % FFT analysis %
     cfg = [];
     cfg.length = 15;
-    EEGtrl = ft_redefinetrial(cfg,EEG)
+    EEGtrl = ft_redefinetrial(cfg,EEG);
     cfg = [];
     cfg.trials = find(~cellfun(@(x) any(isnan(x(:))), EEGtrl.trial));
     % Remove trials with NaNs

@@ -23,10 +23,12 @@ else
     matlab_path = 'C:\Users\yarde\Documents\MATLAB\';
     ft_path     = [matlab_path 'fieldtrip-20210614\'];
     eeglab_path = [matlab_path 'biosig4octmat-3.8.4\biosig\eeglab\'];
-    maindir     = [dat_ay_letter ':\Yarden\'];
+    maindir     = 'C:\Users\yarde\Documents\GitHub\MONAD_Git\'; % [dat_ay_letter ':\Yarden\'];
     % Yarden additions to her PC due to issues with biosig
-    addpath C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4;
+    original_dir = pwd;
+    cd('C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4');
     biosig_installer;
+    cd(original_dir);
 end
 
 extra_func_path = [git_path 'additional_functions\'];
@@ -129,7 +131,7 @@ elseif strcmp('TalKennet', exp)
     env.data.clean_files = fullfile(env.paths.clean, env.data.clean_names);
     env.data.prefix      = '';
     env.data.linenoise   = 50;
-    env.data.fsample     = 512;
+    env.data.fsample     = 1000;
 
     % determine group ('ASD'/'NT'), ASD and Neuro-Typical
     IDs = erase(env.data.clean_names(:), '_clean.mat');
