@@ -96,7 +96,7 @@ cfg.bpfilttype  = 'but';
 cfg.bpfiltord   = 3;
 cfg.bpfiltdir   = 'twopass'; % zero-phase
 
-% Notch filters to remove 50Hz/60Hz and harmonics
+% Notch filters to remove 50Hz and harmonics
 cfg.bsfilter    = 'yes';
 cfg.bsfreq      = [49 51; 99 101; 149 151; 199 201];
 cfg.bsfilttype  = 'but';
