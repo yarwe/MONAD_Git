@@ -79,31 +79,41 @@ for chan=chosen_chans
 end
 
 % Overlayed- all channels
+plot_spect_all_chans(ID,EEG,64,EEG.fsample,[],[],0)
 
 
 %%
-% basic preproc
+% basic preproc: demean, detrend, and re-reference to the mean of all
+% channels
 cfg             = [];
 cfg.demean      = 'yes';
 cfg.detrend     = 'yes';
 cfg.reref       = 'yes';
 cfg.refchannel  = 'all';
 
-% Band-pass filter: 0.5–200 Hz
+% Initial Band-pass filter: 1–200 Hz (to be able to see muscle artefact)
 cfg.bpfilter    = 'yes';
-cfg.bpfreq      = [0.5 200];
+cfg.bpfreq      = [1 200];
 cfg.bpfilttype  = 'but';
 cfg.bpfiltord   = 3;
 cfg.bpfiltdir   = 'twopass'; % zero-phase
 
 % Notch filters to remove 50Hz/60Hz and harmonics
 cfg.bsfilter    = 'yes';
-cfg.bsfreq      = [49 51; 99 101; 149 151; 199 201];
+notch_freq = input(sprintf(['Is the data recorded in the US (60hz line noise) or in Israel/Europe (50hz)? \n' ...
+    'Put the number 50 or 60 accordingly, to apply notch filter around it.']));
+notch_freq_and_harmonics=(notch_freq* (1:4))';
+cfg.bsfreq      = [notch_freq_and_harmonics-1, notch_freq_and_harmonics+1];
 cfg.bsfilttype  = 'but';
 cfg.bsfiltord   = 3; % 3rd order
 cfg.bsfiltdir   = 'twopass'; % zero-phase
 
 pEEG = ft_preprocessing(cfg, EEG);
+
+
+plot_spect_all_chans(ID,pEEG,64,EEG.fsample,[],[],0,[],'after: demean, detrend, filters')
+
+plot_power_spectrum_comparison(EEG, pEEG, ID, 'Cz')
 
 csv_addCol16(env, ID,...
     {'bpfilter', 'bsfilter','detrend', 'demean'},...
@@ -186,6 +196,14 @@ cfg = [];
 cfg.ylim  = [-30 30];
 cfg.blocksize = 30;
 ft_databrowser(cfg,pEEG_mcleanCh)
+
+%% Final band-pass filter
+cfg=[];
+cfg.bpfilter    = 'yes';
+cfg.bpfreq      = [1 100];
+cfg.bpfilttype  = 'but';
+cfg.bpfiltord   = 3;
+cfg.bpfiltdir   = 'twopass'; % zero-phase
 
 %% Run ICA
 addpath([env.paths.ft_path 'external\eeglab\']);

@@ -1,5 +1,14 @@
-function plot_manual_artifacts(data_before_removal, artifact_samples, subject_id, max_segments)
+function plot_manual_artifacts(data_before_removal, artifact_samples, subject_id, max_segments, fontSize)
     % Highlights manually detected artifacts
+    % Input: data_before_removal (FieldTrip structure), artifact_samples (Nx2 array),
+    %        subject_id (string), max_segments (optional, default=5), fontSize (optional, default=12)
+    %
+    % Usage: plot_manual_artifacts(EEG_data, artifact_samples, '011201', 5, 14)
+
+    % Set default fontSize if not provided
+    if nargin < 5
+        fontSize = 12;
+    end
 
     if nargin < 4
         max_segments = 5;
@@ -39,11 +48,12 @@ function plot_manual_artifacts(data_before_removal, artifact_samples, subject_id
         patch([artifact_time(1), artifact_time(end), artifact_time(end), artifact_time(1)], ...
             [yLim(1), yLim(1), yLim(2), yLim(2)], 'orange', 'FaceAlpha', 0.25, 'EdgeColor', 'none');
 
-        ylabel(sprintf('Segment %d', seg));
+        ylabel(sprintf('Segment %d', seg), 'FontSize', fontSize);
+        set(gca, 'FontSize', fontSize);
         grid on;
     end
 
-    xlabel('Time (s)');
-    sgtitle(sprintf('Manual Artifact Detection - Subject %s', subject_id));
+    xlabel('Time (s)', 'FontSize', fontSize);
+    sgtitle(sprintf('Manual Artifact Detection - Subject %s', subject_id), 'FontSize', fontSize);
 
 end

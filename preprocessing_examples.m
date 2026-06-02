@@ -37,11 +37,8 @@ EEG_raw         = load_data12(env, filename_raw);
 clear EEG ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY TMPEEG tmpEEG filename
 
 EEG_pre_clean=load(fullfile(clean_data_path, subject_id + "_clean"));
-if isstruct(EEG_pre_clean)
-    EEG_clean = EEG_pre_clean.dat_after_ICA;
-elseif iscell(EEG_pre_clean)
-    EEG_clean = EEG_pre_clean.dat_after_ICA{1};   
-end
+EEG_clean = EEG_pre_clean.dat_after_ICA{1};   
+
 clear EEG_pre_clean
 %% ========================================================================
 %                         PLOTTING FUNCTIONS
@@ -55,7 +52,7 @@ plot_signal_comparison(EEG_raw, EEG_clean, subject_id, 'T8')
 plot_power_spectrum_comparison(EEG_raw, EEG_clean, subject_id, 'Cz')
 
 %% 3. ICA COMPONENTS - TOPOGRAPHY AND TIME SERIES
-plot_ica_components(comp, cfg_layout, 10, subject_id)
+plot_ica_components(comp, env.lay, 10, subject_id)
 
 %% 4. FP1/FP2 BEFORE AND AFTER pre-processing
 plot_frontal_channels_ica(raw_data_path, clean_data_path, subject_id)
