@@ -25,7 +25,7 @@ The second script to run. Steps:
 * Compute the LAVI and build (or append to) a participant-level data frame using create_datArr21():
 * cfg.prev = 'add' — compute LAVI for specific participants and append to an existing data frame
 * cfg.prev = 'all' — recompute LAVI across all clean datasets
-Note: If you already have the complete data frame, skip to the load cell
+* Note: If you already have the complete data frame, skip to the load cell
 * Compute spectral peaks from the LAVI and generate plots	  
 
 
