@@ -14,8 +14,8 @@ function plot_frontal_channels_ica(raw_data, ica_data, subject_id, time_window, 
         time_window = [1, min(30000, size(raw_data.trial{1}, 2))]; % First 30 sec
     end
 
-    fp1_idx = find(strcmp(raw_data.label, 'FP1'));
-    fp2_idx = find(strcmp(raw_data.label, 'FP2'));
+    fp1_idx = find(strcmp(raw_data.label, 'Fp1'));
+    fp2_idx = find(strcmp(raw_data.label, 'Fp2'));
 
     if isempty(fp1_idx) || isempty(fp2_idx)
         disp('Warning: FP1 or FP2 not found. Using first two channels instead.');

@@ -12,7 +12,7 @@ addpath("analysis_MONAD\MONAD_preproc\OSF_simple\new_clean\")
 % experiment names: 
 % 'OSF_simple', 'TalKennet',
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
-env = setupEnviroment11('OSF_simple');
+env = setupEnviroment11(input('Enter experiment name (OSF_simple or TalKennet): ', 's'));
 addpath(env.paths.extra_func);
 
 %% Load single participant
@@ -204,6 +204,7 @@ cfg.bpfreq      = [1 100];
 cfg.bpfilttype  = 'but';
 cfg.bpfiltord   = 3;
 cfg.bpfiltdir   = 'twopass'; % zero-phase
+pEEG_mcleanCh_fb = ft_preprocessing(cfg, pEEG_mcleanCh);
 
 %% Run ICA
 addpath([env.paths.ft_path 'external\eeglab\']);
