@@ -32,16 +32,21 @@ elseif strcmp(type,'LAVI')
         if length(data)<k
             break
         end
-        if ~isempty(data{k}.noise.noise)
-            mats = cellfun(@(s) s.noise.noise{k}, data, 'UniformOutput', false);
+        % --- ADJUSTMENT HERE: Check if the fields exist before reading them --- %
+        % This filters out the noisy-less dataset 2 participants dynamically
+        has_noise = cellfun(@(s) isfield(s, 'noise') && isfield(s.noise, 'noise') && ~isempty(s.noise.noise), data);
+        data_with_noise = data(has_noise);
+        
+        if ~isempty(data_with_noise)
+            mats = cellfun(@(s) s.noise.noise{k}, data_with_noise, 'UniformOutput', false);
             avgNoise{k} = nanmean(cat(3, mats{:}), 3);
         else
             avgNoise{k} = NaN;
         end
+        % --------------------------------------------------------------------- %
     end
     rowMax = cellfun(@(m) max(m, [], 1), avgNoise, 'UniformOutput', false);
     rowMin = cellfun(@(m) min(m, [], 1), avgNoise, 'UniformOutput', false);
-
     grandAvg.noise.noise = avgNoise;
     grandAvg.noise.max = rowMax;
     grandAvg.noise.min = rowMin;
