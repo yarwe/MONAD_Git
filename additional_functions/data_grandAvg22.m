@@ -29,8 +29,15 @@ elseif strcmp(type,'LAVI')
 
     avgNoise = cell(1, 11);
     for k = 1:11
-        mats = cellfun(@(s) s.noise.noise{k}, data, 'UniformOutput', false);
-        avgNoise{k} = nanmean(cat(3, mats{:}), 3);
+        if length(data)<k
+            break
+        end
+        if ~isempty(data{k}.noise.noise)
+            mats = cellfun(@(s) s.noise.noise{k}, data, 'UniformOutput', false);
+            avgNoise{k} = nanmean(cat(3, mats{:}), 3);
+        else
+            avgNoise{k} = NaN;
+        end
     end
     rowMax = cellfun(@(m) max(m, [], 1), avgNoise, 'UniformOutput', false);
     rowMin = cellfun(@(m) min(m, [], 1), avgNoise, 'UniformOutput', false);

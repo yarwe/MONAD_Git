@@ -1,10 +1,13 @@
 clc; clear all; close all;
+% experiment names: 
+% 'OSF_simple', 'TalKennet',
+% 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 [env] = setupEnviroment11('OSF_simple');
 addpath(env.paths.LAVI);
 
 % set parameters for LAVI and FFT
-chosen_ch = {'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
-foi = 1:0.5:90;
+chosen_ch = { 'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
+foi = 1:0.5:90; %
 
 % set LAVI parameters
 Lcfg = [];
@@ -48,7 +51,7 @@ FFT_arr  = load([env.paths.preproc 'FFT_arr']).FFT_arr;
 N = length(env.data.clean_files);
 
 %% Grand Average of Each Group (ASD, NT, SCZ, fft and LAVI)
-exp_groups = {'ASD', 'NT', 'SCZ'};
+exp_groups = {'ASD', 'NT'};
 groups = []
 % --- Grand average LAVI across participats --- %
 % Extract IDs and split groups
@@ -119,109 +122,88 @@ end
 % chosen_ch: which channels to plot. In case of more than one channel, plots the average
 % noise_var: whether to plot the pink noise simulations or not (LAVI only)
 % noiseCh: which channel of noise to show the pink noise simulations of.
-
-dependant_variable = 'fft'; % 'LAVI' or 'fft'
-plot_groups = {'ASD', 'NT', 'SCZ'};
+dependant_variable = 'LAVI'; % 'LAVI' or 'fft'
+plot_groups = {'ASD', 'NT'};
 chosen_ch = {'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
-noise_var = 1;       % Only used when dependant_variable = 'LAVI'
+noise_var = 1; % Only used when dependant_variable = 'LAVI'
 noiseCh = 'Cz';
-
+% foi
 xfoi = [1, 40];
 FOI = Lcfg.foi;
 
 % Find noise channel index (only needed for LAVI)
 if strcmp(dependant_variable, 'LAVI')
-    noiseChIdx = find(strcmp(noiseCh, groups(1).GA_LAVI.noise.labels));
+noiseChIdx = find(strcmp(noiseCh, groups(1).GA_LAVI.noise.labels));
 end
- 
-% --- Plots Setup --- % 
+
+% --- Plots Setup --- %
 close all; figure; hold on;
-p = [];                                % Line handles (for legend)
-legend_names = {};                     % Legend text
+p = []; % Line handles (for legend)
+legend_names = {}; % Legend text
 % --- NOISE PLOTTING (LAVI only) --- %
-
 if strcmp(dependant_variable, 'LAVI') && noise_var
-
     % Pink noise reference line
     h_noise = plot(FOI, G.noise.noise{noiseChIdx}, ...
-        'Color', [0.8 0.2 0.5], 'LineWidth', 3);
-    
+    'Color', [0.8 0.2 0.5], 'LineWidth', 3);
     uistack(h_noise, 'top');
     legend_names{end+1} = 'Pink Noise';
-
     % Optional: envelope across groups
-    allNoise = cat(3, groups.GA_LAVI);  % easier than loop
-
+    allNoise = cat(3, groups.GA_LAVI); % easier than loop
     allNoise = [];
     for i = 1:numel(plot_groups)
         g_idx = find(strcmp({groups.name}, plot_groups{i}));
         allNoise = cat(3, allNoise, groups(g_idx).GA_LAVI.noise.noise{noiseChIdx});
     end
-
     maxNoise = max(allNoise, [], 3);
     minNoise = min(allNoise, [], 3);
-
     plot(FOI, maxNoise, 'Color', [0 0 0], 'LineWidth', 1.1, ...
-        'HandleVisibility', 'off');
+    'HandleVisibility', 'off');
     plot(FOI, minNoise, 'Color', [0 0 0], 'LineWidth', 1.1, ...
-        'HandleVisibility', 'off');
+    'HandleVisibility', 'off');
 end
 
 % --- Plot Groups --- %
 for i = 1:numel(plot_groups)
-
     % Which row corresponds to this group name?
     g_idx = find(strcmp({groups.name}, plot_groups{i}));
-
     % Select correct dependent variable struct
     if strcmp(dependant_variable, 'LAVI')
-        G = groups(g_idx).GA_LAVI;
-        dat = groups(g_idx).data_LAVI;
+    G = groups(g_idx).GA_LAVI;
+    dat = groups(g_idx).data_LAVI;
     else
-        G = groups(g_idx).GA_fft;
-        dat = groups(g_idx).data_fft;
+    G = groups(g_idx).GA_fft;
+    dat = groups(g_idx).data_fft;
     end
 
     % Get chosen channels
     [~, chIdx] = ismember(chosen_ch, G.label(:,1));
     chIdx = chIdx(chIdx > 0);
-
     % Average across channels
     EA.powspctrm = nanmean(G.powspctrm(chIdx,:), 1);
-    EA.sd         = nanmean(G.sd(chIdx,:), 1);
-
+    EA.sd = nanmean(G.sd(chIdx,:), 1);
     clr = groups(g_idx).color;
-
     % ----- Main line -----
-    p(i) = plot(FOI, EA.powspctrm, 'LineWidth', 2.5, 'Color', clr);
+    p(i+1) = plot(FOI, EA.powspctrm, 'LineWidth', 2.5, 'Color', clr);
     legend_names{end+1} = sprintf('%s, N=%d', groups(g_idx).name, numel(dat));
-
     % ----- CI Fill -----
     N = numel(dat);
     err = EA.sd / sqrt(N);
-
     % Make polygons
     fill([FOI, fliplr(FOI)], ...
-         [EA.powspctrm - err, fliplr(EA.powspctrm + err)], ...
-         clr, 'FaceAlpha', 0.15, 'EdgeAlpha', 0.2, ...
-         'HandleVisibility', 'off');
+    [EA.powspctrm - err, fliplr(EA.powspctrm + err)], ...
+    clr, 'FaceAlpha', 0.15, 'EdgeAlpha', 0.2, ...
+    'HandleVisibility', 'off');
 end
 
-
 % --- AXES, LABELS, LEGEND ---
-
 xlabel('Frequency (Hz)');
 ylabel(dependant_variable);
-
 title_str = {[dependant_variable ' Spectrum'], ...
-             ['Electrodes: ' strjoin(chosen_ch, ', ')]};
-
+['Electrodes: ' strjoin(chosen_ch, ', ')]};
 if strcmp(dependant_variable, 'LAVI') && noise_var
     title_str{end+1} = ['Pink Noise Electrode: ' noiseCh];
 end
-
 title(title_str, 'FontSize', 12);
-
 % X-axis log scale
 set(gca, 'XScale', 'log');
 xlim(xfoi);
@@ -230,11 +212,11 @@ xt = round(xt, 1);
 xticks(xt);
 xticklabels(string(xt));
 xtickangle(0);
-
 axis square;
-
 % Legend
-legend(p, legend_names, 'Location', 'northwest');
+legend(p, legend_names, 'Location', 'northwest'); 
+
+
 
 
 

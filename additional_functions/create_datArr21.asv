@@ -136,7 +136,7 @@ for s = 1:N
     for e = 1:length(EEG.label)
         disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
         LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
-        if ismember(EEG.label{e}, neigh_labels)
+        if ismember(EEG.label{e}, {neigh_labels{:}})
             Ncfg = [];
             Ncfg.foi = Lcfg.foi;
             Ncfg.fs = samp_rate;

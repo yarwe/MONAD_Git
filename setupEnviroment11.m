@@ -114,7 +114,7 @@ elseif strcmp('TalKennet', exp)
     env.paths.auto      = [env.paths.preproc 'automated\'];
     env.paths.manual    = [env.paths.preproc 'manual\'];
     env.paths.art       = [env.paths.preproc 'artifacts\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
+    env.paths.clean     = [env.paths.preproc 'new_clean\'];
     env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
     env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
     env.paths.ft_path = ft_path;
