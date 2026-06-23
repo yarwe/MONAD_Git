@@ -3,6 +3,9 @@
 % cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
 clc; clear all; close all;
 main_monad_git_folder = input('What is the path of MONAD_Git folder? ', 's');
+if isempty(main_monad_git_folder)
+    main_monad_git_folder=pwd;
+end
 cd(main_monad_git_folder)
 
 %%
@@ -18,7 +21,6 @@ addpath(env.paths.extra_func);
 %% Load single participant
 clc;
 s = 1; % participant number to load
-
 ID          = env.data.ID{s}; 
 disp(ID);
 
@@ -43,8 +45,17 @@ clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST
 
 %% Look at raw data before doing anything
 fs = EEG.fsample; % Get sampling frequnecy
+nEEG= length(env.lay.label); % number of EEG channels
 
+% % Variance of EEG channels
+% Look at variance of channels and mark potential outliers
+var_chans_raw=plot_var_all_chans(ID, EEG, nEEG, 'outlier_methods', {'zscore'}, 'window_sec', 0);
+% According to sliding window
+plot_var_all_chans(ID, EEG, nEEG, 'window_sec', 1);
+
+% Display EEG channels- raw waveform
 cfg = [];
+cfg.channel = 'eeg';
 cfg.demean      = 'yes';
 cfg.detrend     = 'yes';
 cfg.viewmode = 'vertical'; % Or 'butterfly' for overlaid channels
@@ -53,38 +64,14 @@ cfg.position = [1 41 1680 933];
 cfg.ylim = [-3 3]; % Replace with appropriate min and max values for your data
 ft_databrowser(cfg, EEG);
 
-% % Power spectrum
-
-% Channels where the line noise is most visible
-
-% Check and  get indices only if there are such channels in the current
-% data
-
-% Plot
-% pw_raw_all = zeros(,length(EEG.)) % save power spectrum of raw data
-chosen_chans=input(sprintf(['Vector of channel numbers to be plotted. \n' ...
-    'Default is all channels.']));
-if isempty(chosen_chans)
-    nchans=length(EEG.label);
-    chosen_chans=1:nchans;
-end
-for chan=chosen_chans
-    [ps_raw, frq] = pwelch(EEG.trial{1}(chan,:),2*fs,[],[],fs);
-    figure; 
-    plot(frq,ps_raw,'k');
-    set(gca,'FontSize',14,'XScale','log','YScale','log');
-    ylabel(sprintf('Power spectrum of %s',EEG.label{chan}));
-    title(sprintf('Subject %d',s));
-    xlim('tight')
-end
-
+% % Power spectrum of raw data of chosen channels
+% Channels where the line noise is most visible are usually O1,O2
+choose_chans(EEG,fs,s);
 % Overlayed- all channels
-plot_spect_all_chans(ID,EEG,64,EEG.fsample,[],[],0)
+plot_spect_all_chans(ID,EEG,length(env.lay.label),EEG.fsample,[],[],0)
 
-
-%%
-% basic preproc: demean, detrend, and re-reference to the mean of all
-% channels
+%% basic preproc: demean, detrend, re-reference to the mean of all channels, 
+% band pass filter and notch filters for line noise
 cfg             = [];
 cfg.demean      = 'yes';
 cfg.detrend     = 'yes';
@@ -109,22 +96,31 @@ cfg.bsfiltord   = 3; % 3rd order
 cfg.bsfiltdir   = 'twopass'; % zero-phase
 
 pEEG = ft_preprocessing(cfg, EEG);
-
-
 plot_spect_all_chans(ID,pEEG,64,EEG.fsample,[],[],0,[],'after: demean, detrend, filters')
-
-plot_power_spectrum_comparison(EEG, pEEG, ID, 'Cz')
+plot_power_spectrum_comparison(EEG, pEEG, ID, 'demean, detrend, filters', 'Cz')
 
 csv_addCol16(env, ID,...
     {'bpfilter', 'bsfilter','detrend', 'demean'},...
     {mat2str(cfg.bpfreq), mat2str(cfg.bsfreq), cfg.detrend, cfg.demean});
 
-% high amplitude artifact detection
+%% Automatic Artefact dection - high amplitude artifact detection
+
+% GUI explaination:
+% < or > : jump to previous/next flagged segment
+% artifact: Accept Marked "red" areas as artefacts.
+% << >>: Scroll through entire recording
+% keep trial: Mark as CLEAN - False positive - Z-score wrongly flagged normal data
+% reject full: Confirm Z-score detection was correct, but rejects the FULL
+% segment (even the clean parts).
+% reject part: Draw custom artifact boundaries (drag on plot). Use if Z-score boundaries are currently wrong
+% threshold: Adjust cutoff: Change the Z-score threshold on the fly with < and >
+% stop: Done reviewing - Exit the GUI and save your corrections
+
 cfg = [];
-cfg.continuous                   = 'yes';
+cfg.continuous                   = 'yes'; % Data is continuous (no trial boundaries)
 cfg.artfctdef.zvalue.channel     = {'all', '-eogV', '-eogH'};
-cfg.artfctdef.zvalue.cutoff      = 50;
-cfg.artfctdef.zvalue.artpadding  = 0.2;
+cfg.artfctdef.zvalue.cutoff      = 50; % Flag samples with |Z| > 50 as artifacts
+cfg.artfctdef.zvalue.artpadding  = 0.2; % Include 0.2s before & after artifact
 cfg.artfctdef.zvalue.zscore      = 'yes';
 cfg.artfctdef.zvalue.interactive = 'yes';
 [cfg, z_artifact] = ft_artifact_zvalue(cfg, pEEG);
@@ -197,7 +193,7 @@ cfg.ylim  = [-30 30];
 cfg.blocksize = 30;
 ft_databrowser(cfg,pEEG_mcleanCh)
 
-%% Final band-pass filter
+%% Final band-pass filter: 1,100Hz
 cfg=[];
 cfg.bpfilter    = 'yes';
 cfg.bpfreq      = [1 100];
@@ -233,7 +229,7 @@ saveas(fig, [env.paths.ICApng env.exp '_' ID '_ICAcomp.png']);
 
 %% reject components
 cfg = [];
-cfg.component = [1,3,20];
+cfg.component = input('Which Component number do you wish to reject? e.g., 2, [1,3,20] : '); % e.g., [1,3,20]
 dat_after_ICA = ft_rejectcomponent(cfg, comp);
 
 comp_idx = {arrayfun(@num2str, cfg.component, 'UniformOutput', false)};
@@ -252,6 +248,7 @@ cfg.artfctdef.visual.artifact = man_art2.artfctdef.visual.artifact;
 dat_after_ICA = ft_rejectartifact(cfg,dat_after_ICA);
 
 %% keep data in array to be saved later
+j=0;
 j = j + 1;
 all_data{1,j} = {dat_after_ICA};
 all_data{2,j} = ID;
