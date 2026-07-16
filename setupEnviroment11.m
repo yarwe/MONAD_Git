@@ -1,11 +1,25 @@
-function [env] = setupEnvironment(exp)
+function [env] = setupEnviroment11(exp)
 % 'OSF_simple', 'TalKennet', 'NMSG' (Neural Markers of Shared Gaze...)
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 % List of possible experiment names
-experiments = {'OSF_simple', 'TalKennet', 'NMSG', 'IAASA'};
+experiments = {'OSF_simple', 'TalKennet', 'NMSG', 'IAASA','SFARI_EEG_multi'};
+paradigms_tal = {'tactile' ,  'aud' , 'rest'};
+paradigms_SFARI={'ASSR_run' ,  'FAST_run' , 'Beepflash_run' , 'AVSRT_run' , 'Motor_run' , 'IC_run' , 'rest'};
 % Check if the provided experiment name exists in the list
 if ~ismember(exp, experiments)
     error('Experiment name does not exist');  % Break and display error message
+end
+
+if strcmpi(exp,'TalKennet')
+    paradigm=input('Enter paradigm name (tactile /  aud / rest): ', 's');
+    if ~ismember(paradigm, paradigms_tal)
+        error('Paradigm name does not exist');  % Break and display error message
+    end
+elseif strcmpi(exp,'SFARI_EEG_multi')
+    paradigm=input('Enter paradigm name (ASSR_run /  FAST_run / Beepflash_run / AVSRT_run / Motor_run / IC_run / rest): ', 's');
+    if ~ismember(paradigm, paradigms_SFARI)
+        error('Paradigm name does not exist');  % Break and display error message
+    end
 end
 
 % setup paths according to user.
@@ -30,34 +44,46 @@ else
     biosig_installer;
     cd(original_dir);
 end
-
+env.paths.csv_log    = [maindir 'csv_log\'];
 extra_func_path = [git_path 'additional_functions\'];
-addpath(extra_func_path); % Yarden commented
-addpath(ft_path);
-ft_defaults();
+addpath(extra_func_path);
+% Add path to zapline clean plus
+addpath([ matlab_path 'zapline-plus-main\'])
 
 preprocDir           = [maindir 'analysis_MONAD\MONAD_preproc'];
 env.exp              = exp;
 env.paths.extra_func = extra_func_path;
 env.paths.eeglab     = eeglab_path;
 env.dat_ay           = dat_ay_letter;
+
+% Initialize eeglab
+addpath(genpath(env.paths.eeglab));
+eeglab; close all;
+% Initialize fieldtrip
+addpath(ft_path);
+ft_defaults();
+
 % Check if the folder for this exp exists, if not, create it and the subfolders
 exp_folder = [preprocDir '\' exp '\'];
 if ~exist(exp_folder, 'dir')
     % Create the main folder for the experiment
     mkdir(exp_folder);
-    % Create subfolders
-    env.paths.auto      = [exp_folder 'automated\'];
-    env.paths.manual    = [exp_folder 'manual\'];
+    % % Create subfolders
+    % env.paths.auto      = [exp_folder 'automated\'];
+    % env.paths.manual    = [exp_folder 'manual\'];
     env.paths.art       = [exp_folder 'artifacts\'];
     env.paths.clean     = [exp_folder 'clean\'];
     env.paths.ICApng    = [exp_folder 'ICApng\'];
-    % Create the directories
-    mkdir(env.paths.auto);
-    mkdir(env.paths.manual);
+    env.paths.ica_comp = [exp_folder 'ica_comp\'];
+    env.paths.prev_dat = ['D:\MONAD ASD project\' exp '\prev_dat\'];
+    % % Create the directories
+    % mkdir(env.paths.auto);
+    % mkdir(env.paths.manual);
     mkdir(env.paths.art);
     mkdir(env.paths.clean);
     mkdir(env.paths.ICApng);
+    mkdir(env.paths.ica_comp)
+    mkdir(env.paths.prev_dat)
 end
 env.paths.maindir = maindir;
 %c = uisetcolor
@@ -69,16 +95,15 @@ env.plots.lineSCZ =  [0.9000    0.6667    0.9];
 if strcmp('OSF_simple', exp)
     env.paths.raw       = [maindir 'OSF data\Simple\'];
     env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    env.paths.auto      = [env.paths.preproc 'automated\'];
-    env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'new_art\'];
-    env.paths.clean     = [env.paths.preproc 'new_clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'new_ICApng\'];
+    % env.paths.auto      = [env.paths.preproc 'automated\'];
+    % env.paths.manual    = [env.paths.preproc 'manual\'];
+    env.paths.art       = [env.paths.preproc 'art\'];
+    env.paths.clean     = [env.paths.preproc 'clean\'];
+    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
     env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
+    env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
+    env.paths.prev_dat = ['D:\MONAD ASD project\' exp '\prev_dat\'];
     env.paths.ft_path = ft_path;
-
-    
-    
     cfg = [];
     cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
     env.lay = ft_prepare_layout(cfg);
@@ -96,8 +121,9 @@ if strcmp('OSF_simple', exp)
     % change clean_names to participant IDs
     env.data.clean_names = cellfun(@(x) extractBefore(x, '_'), env.data.clean_names, 'UniformOutput', false);
     env.data.prefix      = '_Simpletone.bdf';
-    env.data.linenoise   = 50;
+    env.data.linenoise   = 60;
     env.data.fsample     = 512;
+    env.nEEG= length(env.lay.label); % number of EEG channels
 
     % determine group ('ASD'/'NT'), ASD and Neuro-Typical
     IDs = erase(env.data.clean_names(:), '_clean.mat');
@@ -109,18 +135,26 @@ if strcmp('OSF_simple', exp)
     
 elseif strcmp('TalKennet', exp)
     env.paths.exp       = [maindir 'NIMH data\'];
-    env.paths.raw       = [maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\eeg_sub_files01\'];
+    env.paths.raw       = [maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\eeg_sub_files01\' paradigm];
     env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    env.paths.auto      = [env.paths.preproc 'automated\'];
-    env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'artifacts\'];
-    env.paths.clean     = [env.paths.preproc 'new_clean\'];
+    % env.paths.auto      = [env.paths.preproc 'automated\'];
+    % env.paths.manual    = [env.paths.preproc 'manual\'];
+    env.paths.art       = [env.paths.preproc 'art\'];
+    env.paths.clean     = [env.paths.preproc 'clean\'];
     env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
     env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
+    env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
+    env.paths.prev_dat = [env.paths.preproc 'prev_dat\'];
     env.paths.ft_path = ft_path;
     
     env.lay  = load([maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\TK_customLay.mat']);
     env.lay  = env.lay.layout;
+    % Fix Iz- written as IZ and later not recognized as EEG channel
+    IZ_ind=find(strcmp(env.lay.label,'IZ'));
+    if ~isempty(IZ_ind)
+        env.lay.label(IZ_ind)={'Iz'};
+    end
+    
     env.elec = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
 
     env.data.type        = 'fif';
@@ -130,8 +164,48 @@ elseif strcmp('TalKennet', exp)
     env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
     env.data.clean_files = fullfile(env.paths.clean, env.data.clean_names);
     env.data.prefix      = '';
-    env.data.linenoise   = 50;
+    env.data.linenoise   = 60;
     env.data.fsample     = 1000;
+    env.nEEG= length(env.lay.cfg.elec.label); % number of EEG channels
+
+    % determine group ('ASD'/'NT'), ASD and Neuro-Typical
+    IDs = erase(env.data.clean_names(:), '_clean.mat');
+    env.data.group_table = table(IDs, replace(extractBefore(IDs, 2), {'A', 'C'}, ...
+        {'ASD', 'NT'}), 'VariableNames', {'ID', 'group'});
+
+elseif strcmp('SFARI_EEG_multi', exp)
+    % External drive due to the heavy data
+    env.paths.exp       = 'D:\MONAD ASD project\SFARI_EEG multi-paradigm dataset (BIDS) OpenNeuro\';
+    % (!!) At the moment- only ASSR data
+    env.paths.raw       = [env.paths.exp 'raw_ASSR\'];
+    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
+    env.paths.art       = [env.paths.preproc 'art\'];
+    env.paths.clean     = [env.paths.preproc 'clean\'];
+    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
+    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
+    env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
+    env.paths.prev_dat = [env.paths.preproc 'prev_dat\'];
+    env.paths.ft_path = ft_path;
+
+    cfg = [];
+    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
+    env.lay = ft_prepare_layout(cfg);
+    env.lay.height = env.lay.height(1:64);
+    env.lay.label  = env.lay.label(1:64);
+    env.lay.pos    = env.lay.pos(1:64,:);
+    env.lay.width  = env.lay.width(1:64);
+
+    env.data.type        = 'bdf';
+    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};    
+    env.data.ID = cellfun(@(x) regexprep(x, '^sub-(.*?)_.*$', '$1'), env.data.names, 'UniformOutput', false);
+    env.data.files       = fullfile(env.paths.raw, env.data.names);
+    env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
+    env.data.clean_files = fullfile(env.paths.clean, env.data.clean_names);
+    % change clean_names to participant IDs
+    env.data.clean_names = cellfun(@(x) extractBefore(x, '_'), env.data.clean_names, 'UniformOutput', false);
+    env.data.prefix      = '_task-ASSR_run-01_eeg.bdf';
+    env.data.linenoise   = 60;
+    env.data.fsample     = 512;
 
     % determine group ('ASD'/'NT'), ASD and Neuro-Typical
     IDs = erase(env.data.clean_names(:), '_clean.mat');
@@ -203,4 +277,20 @@ elseif strcmp('IAASA', exp)
 
 
 
+end
+
+% Check all paths: warn if missing for read-only paths, create if missing for output paths
+error_paths = {'extra_func', 'eeglab', 'maindir', 'LAVI', 'ft_path', 'raw'};
+path_fields = fieldnames(env.paths);
+for i = 1:numel(path_fields)
+    field = path_fields{i};
+    p     = env.paths.(field);
+    if ~exist(p, 'dir')
+        if ismember(field, error_paths)
+            warning('Required folder does not exist: %s = %s', field, p);
+        else
+            mkdir(p);
+            fprintf('Created folder: %s\n', p);
+        end
+    end
 end

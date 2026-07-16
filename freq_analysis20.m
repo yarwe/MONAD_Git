@@ -6,8 +6,8 @@ clc; clear all; close all;
 addpath(env.paths.LAVI);
 
 % set parameters for LAVI and FFT
-chosen_ch = { 'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
-foi = 1:0.5:90; %
+chosen_ch = { 'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'} ;
+foi = 1:0.5:90;
 
 % set LAVI parameters
 Lcfg = [];
@@ -16,11 +16,17 @@ Lcfg.lag = 1.5;
 Lcfg.width = 5;
 Lcfg.fs    = env.data.fsample;
 
+% If was down-sample
+if Lcfg.fs>800  
+    Lcfg.fs = Lcfg.fs/2;
+    warning('Sampling rate was higher than accepted, assumed half of it.')
+end
+
 % set fft parameters
 Fcfg = [];
 Fcfg.foi = foi;
 Fcfg.output = 'pow';
-Fcfg.channel = 'all';
+Fcfg.channel = 'all'; 
 Fcfg.method  = 'mtmfft';
 Fcfg.pad = 'nextpow2';
 Fcfg.taper   = 'hanning';
@@ -51,11 +57,13 @@ FFT_arr  = load([env.paths.preproc 'FFT_arr']).FFT_arr;
 N = length(env.data.clean_files);
 
 %% Grand Average of Each Group (ASD, NT, SCZ, fft and LAVI)
-exp_groups = {'ASD', 'NT', 'SCZ'};
-groups = []
+exp_groups = {'ASD', 'NT'};
+groups = [];
+
 % --- Grand average LAVI across participats --- %
 % Extract IDs and split groups
 IDs = cellfun(@(s) s.ID, LAVI_arr, 'UniformOutput', false);
+% Define all possible groups
 all_groups = struct( ...
     'name', {'ASD', 'NT', 'SCZ'}, ...
     'label', {'A', 'C', 'S'}, ...
@@ -65,10 +73,52 @@ all_groups = struct( ...
 % Filter based on plot_groups
 groups = all_groups(ismember({all_groups.name}, exp_groups));
 
+% TalKenet group file
+talKenet_group_file = fullfile( ...
+    'C:\Users\yarde\Documents\GitHub\MONAD_Git\NIMH data', ...
+    'Package_1235544-Tal Kenet MEG EEG biomarkers', ...
+    'Number_group_meg_eeg_biomarkers.csv' ...
+);
+
+% Load TalKenet group table only when needed
+if strcmpi(env.exp, 'TalKennet')
+    TalKenet_table = readtable(talKenet_group_file);
+
+    % Make sure IDs are comparable as strings
+    TalKenet_table.Number = string(TalKenet_table.Number);
+    TalKenet_table.Group  = string(TalKenet_table.Group);
+
+    IDs_str = string(IDs);
+
+    % Convert TD in the file to NT in your code terminology
+    TalKenet_table.Group(TalKenet_table.Group == "TD") = "NT";
+    
+    % CSV removes zero at begining when treated as number
+    TalKenet_table.Number = pad(TalKenet_table.Number, 6, 'left', '0');
+end
+
+
 % Load data into groups
 for i = 1:numel(groups)
-    idx = contains(IDs, groups(i).label);
-    groups(i).data_LAVI = LAVI_arr(idx);
+
+    if strcmpi(env.exp, 'OSF_simple')
+
+        idx = contains(IDs, groups(i).label);
+        groups(i).data_LAVI = LAVI_arr(idx);
+
+    elseif strcmpi(env.exp, 'TalKennet')
+
+        this_group = string(groups(i).name);
+
+        % Find IDs that belong to the current group
+        group_IDs = TalKenet_table.Number(TalKenet_table.Group == this_group);
+
+        % Match LAVI_arr IDs to table IDs
+        idx = ismember(IDs_str, group_IDs);
+
+        groups(i).data_LAVI = LAVI_arr(idx);
+
+    end
 end
 
 % Grand averages
@@ -81,25 +131,39 @@ for i = 1:numel(groups)
 end
 
 % --- Gran average fft across participants --- %
-% Extract IDs and split groups for LAVI
+% Extract IDs and split groups for fft
 IDs = cellfun(@(s) s.ID{:}, FFT_arr, 'UniformOutput', false);
-all_groups = struct( ...
-    'name', {'ASD', 'NT', 'SCZ'}, ...
-    'label', {'A', 'C', 'S'}, ...
-    'color', {env.plots.lineASD, env.plots.lineNT, env.plots.lineSCZ} ...
-);
+IDs_str = string(IDs);
+
+if strcmpi(env.exp, 'OSF_simple')
+    IDs = cellfun(@(x) x{1}, IDs, 'UniformOutput', false);
+end
 
 % Load data into groups
 for i = 1:numel(groups)
-    idx = contains(IDs, groups(i).label);
-    groups(i).data_fft = FFT_arr(idx);
-end
 
+    if strcmpi(env.exp, 'OSF_simple')
+        idx = contains(IDs, groups(i).label);
+        groups(i).data_fft = FFT_arr(idx);
+
+    elseif strcmpi(env.exp, 'TalKennet')
+
+        this_group = string(groups(i).name);
+
+        % Find IDs that belong to the current group
+        group_IDs = TalKenet_table.Number(TalKenet_table.Group == this_group);
+
+        % Match FFT_arr IDs to table IDs
+        idx = ismember(IDs_str, group_IDs);
+
+        groups(i).data_fft = FFT_arr(idx);
+
+    end
+end
 % Grand averages
 cfg = [];
 cfg.channel = chosen_ch;
 cfg.type = 'powspctrm'; % grand average powerspectrm values
-
 for i = 1:numel(groups)
     [groups(i).GA_fft] = data_grandAvg22(cfg, groups(i).data_fft);
 end
@@ -116,131 +180,61 @@ end
 
 
 %% plotting
-% this code allows for plotting of both fft and LAVI spectrums.
-% dependant_variable: 'fft' or 'LAVI' whether to plot the fft or LAVI spectrums
-% plot_groups: which groups to plot. ASD (autism), NT (Neuro Typical) and SCZ (scizophrenia)
-% chosen_ch: which channels to plot. In case of more than one channel, plots the average
-% noise_var: whether to plot the pink noise simulations or not (LAVI only)
-% noiseCh: which channel of noise to show the pink noise simulations of.
+% Plots LAVI or FFT grand-average spectra for the chosen groups via plotSpectrum.
+% pcfg.dependant_variable : 'fft' or 'LAVI', which spectrum to plot
+% pcfg.plot_groups        : which groups to plot (ASD, NT, SCZ)
+% pcfg.chosen_ch          : channels to plot (averaged if more than one)
+% pcfg.noise_var          : whether to plot the pink noise simulations (LAVI only)
+% pcfg.noiseCh            : which channel's pink noise to show
+pcfg = [];
+pcfg.dependant_variable = 'fft';   % 'LAVI' or 'fft'
+pcfg.plot_groups = {'ASD','NT'};
+pcfg.chosen_ch   ={'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
+pcfg.noise_var   = false;            % set false to hide the pink noise (LAVI only)
+pcfg.noiseCh     = 'Cz';
+pcfg.FOI  = Lcfg.foi;
+pcfg.xfoi = [1, 90];
 
-dependant_variable = 'fft'; % 'LAVI' or 'fft'
-plot_groups = {'ASD', 'NT', 'SCZ'};
-chosen_ch = {'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
-noise_var = 1;       % Only used when dependant_variable = 'LAVI'
-noiseCh = 'Cz';
+close all;
+[p, legend_names] = plotSpectrum(pcfg, groups);
 
-% foi
-xfoi = [1, 90];
-FOI = Lcfg.foi;
+%% FFT real time 
+[durTbl, summary] = fftRecordingTime(FFT_arr, 5)
 
-% Find noise channel index (only needed for LAVI)
-if strcmp(dependant_variable, 'LAVI')
-    noiseChIdx = find(strcmp(noiseCh, groups(1).GA_LAVI.noise.labels));
-end
- 
-% --- Plots Setup --- % 
-close all; figure; hold on;
-p = [];                                % Line handles (for legend)
-legend_names = {};                     % Legend text
-% --- NOISE PLOTTING (LAVI only) --- %
+%% Compute relative alpha (8-13hz) and absolute and relative gamma (>30hz)
+% Following this review from 2023: "Resting-state EEG power differences in autism spectrum
+% disorder: a systematic review and meta-analysis".
+% absolute power = integral of the FFT power spectrum within a band.
+% relative power = band absolute power / total absolute power (sum over bands).
+% Bands: delta (<4), theta (4-8), alpha (8-13), beta (13-30), gamma (>30).
 
-if strcmp(dependant_variable, 'LAVI') && noise_var
+% --- Compute absolute & relative band power per participant, per group ---
+bpcfg = [];
+bpcfg.chosen_ch = chosen_ch;      % region of interest (central channels)
+bpcfg.fmax      = max(foi);       % cap the open gamma band to the analysis range (90 Hz)
 
-    % Pink noise reference line
-    h_noise = plot(FOI, G.noise.noise{noiseChIdx}, ...
-        'Color', [0.8 0.2 0.5], 'LineWidth', 3);
-    
-    uistack(h_noise, 'top');
-    legend_names{end+1} = 'Pink Noise';
+% NOTE: gamma (30-fmax) spans the 60 Hz line-noise frequency; if line noise is
+% not fully removed, lower fmax (e.g. 45) or notch it before trusting gamma power.
+bandPow = computeBandPower(bpcfg, groups);        % both groups (ASD, NT)
+% For a single group only:
+% bandPow = computeBandPower(bpcfg, groups(strcmp({groups.name}, 'ASD')));
 
-    % Optional: envelope across groups
-    allNoise = cat(3, groups.GA_LAVI);  % easier than loop
+% --- Plot distributions per band and report group statistics ---
+% One figure per band; shows absolute & relative power for each group with
+% mean +/- SD, Cohen's d, t-value and p-value (Welch's two-sample t-test).
+ppcfg = [];
+ppcfg.bands   = 'all';            % or e.g. 'alpha', or {'alpha','gamma'}
+ppcfg.measure = 'both';           % 'abs', 'rel', or 'both'
+ppcfg.colors  = [env.plots.lineASD; env.plots.lineNT];
+bandStats = plotBandPower(ppcfg, bandPow);
 
-    allNoise = [];
-    for i = 1:numel(plot_groups)
-        g_idx = find(strcmp({groups.name}, plot_groups{i}));
-        allNoise = cat(3, allNoise, groups(g_idx).GA_LAVI.noise.noise{noiseChIdx});
-    end
+% Example: only alpha and gamma, relative power, single group:
+% ppcfg.bands = {'alpha','gamma'}; ppcfg.measure = 'rel';
+% plotBandPower(ppcfg, bandPow(strcmp({bandPow.name}, 'ASD')));
 
-    maxNoise = max(allNoise, [], 3);
-    minNoise = min(allNoise, [], 3);
-
-    plot(FOI, maxNoise, 'Color', [0 0 0], 'LineWidth', 1.1, ...
-        'HandleVisibility', 'off');
-    plot(FOI, minNoise, 'Color', [0 0 0], 'LineWidth', 1.1, ...
-        'HandleVisibility', 'off');
-end
-
-% --- Plot Groups --- %
-for i = 1:numel(plot_groups)
-
-    % Which row corresponds to this group name?
-    g_idx = find(strcmp({groups.name}, plot_groups{i}));
-
-    % Select correct dependent variable struct
-    if strcmp(dependant_variable, 'LAVI')
-        G = groups(g_idx).GA_LAVI;
-        dat = groups(g_idx).data_LAVI;
-    else
-        G = groups(g_idx).GA_fft;
-        dat = groups(g_idx).data_fft;
-    end
-
-    % Get chosen channels
-    [~, chIdx] = ismember(chosen_ch, G.label(:,1));
-    chIdx = chIdx(chIdx > 0);
-
-    % Average across channels
-    EA.powspctrm = nanmean(G.powspctrm(chIdx,:), 1);
-    EA.sd         = nanmean(G.sd(chIdx,:), 1);
-
-    clr = groups(g_idx).color;
-
-    % ----- Main line -----
-    p(i) = plot(FOI, EA.powspctrm, 'LineWidth', 2.5, 'Color', clr);
-    legend_names{end+1} = sprintf('%s, N=%d', groups(g_idx).name, numel(dat));
-
-    % ----- CI Fill -----
-    N = numel(dat);
-    err = EA.sd / sqrt(N);
-
-    % Make polygons
-    fill([FOI, fliplr(FOI)], ...
-         [EA.powspctrm - err, fliplr(EA.powspctrm + err)], ...
-         clr, 'FaceAlpha', 0.15, 'EdgeAlpha', 0.2, ...
-         'HandleVisibility', 'off');
-end
-
-
-% --- AXES, LABELS, LEGEND ---
-
-xlabel('Frequency (Hz)');
-ylabel(dependant_variable);
-
-title_str = {[dependant_variable ' Spectrum'], ...
-             ['Electrodes: ' strjoin(chosen_ch, ', ')]};
-
-if strcmp(dependant_variable, 'LAVI') && noise_var
-    title_str{end+1} = ['Pink Noise Electrode: ' noiseCh];
-end
-
-title(title_str, 'FontSize', 12);
-
-% X-axis log scale
-set(gca, 'XScale', 'log');
-xlim(xfoi);
-xt = logspace(log10(xfoi(1)), log10(xfoi(2)), 12);
-xt = round(xt, 1);
-xticks(xt);
-xticklabels(string(xt));
-xtickangle(0);
-
-axis square;
-
-% Legend
-legend(p, legend_names, 'Location', 'northwest');
-
-
+% With outliers
+ppcfg.exclude_subjects = {'102901', '104001', '101801'};
+bandStats = plotBandPower(ppcfg, bandPow);
 
 %% plot signle subject LAVI with noise
 figure;

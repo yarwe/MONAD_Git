@@ -1,8 +1,15 @@
-function csv_init(env, ID)
-    if ~isfield(env, 'dat_ay')
-        logFile = 'R:\Yarden\MONAD_log.csv';
+function [logFile] = csv_init15(env, ID)
+% Initiates the main csv log file
+    csv_name_file = "MONAD_log.csv";
+    if isfield(env.paths,'csv_log')
+        logFile = fullfile(env.paths.csv_log, csv_name_file);
+        if ~exist(env.paths.csv_log, 'dir')
+            mkdir(env.paths.csv_log);
+        end
+    elseif ~isfield(env, 'dat_ay')
+        logFile = fullfile('R:\Yarden\', csv_name_file);
     else
-        logFile = [env.dat_ay ':\Yarden\MONAD_log.csv'];
+        logFile = fullfile(env.dat_ay, ':\Yarden\', csv_name_file);
     end
     
     if ~isfile(logFile)
@@ -12,7 +19,10 @@ function csv_init(env, ID)
         writecell([headers; data], logFile);
     else
         % If log.csv exists, retrieve the current content.
-        dataTable = readtable(logFile, 'TextType', 'string');
+        opts = detectImportOptions(logFile);
+        opts = setvartype(opts, opts.VariableNames, 'string');   % force every column to text
+        dataTable = readtable(logFile, opts);
+        % dataTable = readtable(logFile, 'TextType', 'string');
         
         % Check if the 'ID' already exists.
         if any(dataTable.ID == ID) & any(dataTable.exp == env.exp) 
@@ -26,7 +36,7 @@ function csv_init(env, ID)
         % Add a new row with placeholders for other columns.
         newRow = array2table(repmat("--", 1, width(dataTable)), 'VariableNames', dataTable.Properties.VariableNames);
         newRow.exp = env.exp;
-        newRow.ID = ID;
+        newRow.ID = string(ID);
         
         % Append the new row.
         dataTable = [dataTable; newRow];

@@ -1,4 +1,5 @@
-function plot_power_spectrum_comparison(raw_data, ica_data, subject_id, channel_name, fontSize)
+function plot_power_spectrum_comparison(raw_data, ica_data, subject_id, ...
+    stage_str, channel_name, fontSize)
     % Plot power spectrum (Welch's method) for a channel before/after ICA
     % Input: raw_data, ica_data (FieldTrip structures), subject_id (string),
     %        channel_name (optional, default='Cz'), fontSize (optional, default=12)
@@ -6,11 +7,11 @@ function plot_power_spectrum_comparison(raw_data, ica_data, subject_id, channel_
     % Usage: plot_power_spectrum_comparison(EEG_raw, EEG_clean, '011201', 'Cz', 14)
 
     % Set default fontSize if not provided
-    if nargin < 5
+    if nargin < 6
         fontSize = 12;
     end
 
-    if nargin < 4
+    if nargin < 5
         channel_name = 'Cz'; % default channel
     end
 
@@ -43,7 +44,8 @@ function plot_power_spectrum_comparison(raw_data, ica_data, subject_id, channel_
     xlabel('Frequency (Hz)', 'FontSize', fontSize);
     ylabel('Power (µV²/Hz)', 'FontSize', fontSize);
     title(sprintf('Power Spectrum - %s - Subject %s', channel_name, subject_id), 'FontSize', fontSize);
-    legend('Before ICA', 'After ICA', 'FontSize', fontSize);
+    legend(sprintf('Before %s',stage_str), sprintf('After %s',stage_str),...
+        'FontSize', fontSize);
     set(gca, 'FontSize', fontSize);
     grid on;
 
@@ -55,7 +57,7 @@ function plot_power_spectrum_comparison(raw_data, ica_data, subject_id, channel_
     xlabel('Frequency (Hz)', 'FontSize', fontSize);
     ylabel('Power (µV²/Hz)', 'FontSize', fontSize);
     title(sprintf('Power Spectrum (log-log) - %s - Subject %s', channel_name, subject_id), 'FontSize', fontSize);
-    legend('Before pre-processing', 'After pre-processing', 'FontSize', fontSize);
+    legend(sprintf('Before %s',stage_str), sprintf('After %s',stage_str), 'FontSize', fontSize);
     set(gca, 'FontSize', fontSize);
     grid on;
 

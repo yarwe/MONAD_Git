@@ -1,19 +1,21 @@
-function csv_addCol(env, ID, colNames, colValues, dat_ay)
-    if ~exist("dat_ay",'var')
-        logFile = 'R:\Yarden\MONAD_log.csv';
-    else
-        logFile = [dat_ay ':\Yarden\MONAD_log.csv'];
-    end
-    
+function csv_addCol16(env,logFile, ID, colNames, colValues)
+% Addes coloums/rows to existing log csv file.
     if ~isfile(logFile)
         error('log.csv does not exist. Please initialize it using csv_init first.');
     end
     
     % Read the current log file.
-    dataTable = readtable(logFile, 'TextType', 'string');
+    opts = detectImportOptions(logFile);
+    opts = setvartype(opts, opts.VariableNames, 'string');
+    if ismember('exp', opts.VariableNames)
+        opts = setvartype(opts, 'exp', 'string');
+    end
+    dataTable = readtable(logFile, opts);
+
     
     % Check if the ID exists.
-    rowIndex = find(dataTable.ID == ID & dataTable.exp == env.exp, 1);
+    id_no_lead_0=regexprep(string(ID), '^0+(?=\d)', '');
+    rowIndex = find((strcmpi(dataTable.ID,string(ID)) | strcmpi(dataTable.ID,id_no_lead_0)) & dataTable.exp == env.exp, 1);
     if isempty(rowIndex)
         error('ID "%s" not found in the log file. Please initialize it using csv_init first.', ID);
     end

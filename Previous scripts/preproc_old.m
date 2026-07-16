@@ -2,11 +2,47 @@
 cd('C:\Users\yoelgo\Documents\GitHub\MONAD_Git');
 %cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
 clc; clear all; close all;
+
+%% %% Add paths
+
+% addpath("analysis_MONAD\MONAD_preproc\OSF_simple\new_clean\")
+
+%% Notch filters to remove 50Hz/60Hz and harmonics
+cfg.bsfilter    = 'yes';
+notch_freq = input(sprintf(['Is the data recorded in the US (60hz line noise) or in Israel/Europe (50hz)? \n' ...
+    'Put the number 50 or 60 accordingly, to apply notch filter around it.']));
+notch_freq_and_harmonics=(notch_freq* (1:2))';
+cfg.bsfreq      = [notch_freq_and_harmonics-1, notch_freq_and_harmonics+1];
+cfg.bsfilttype  = 'but';
+cfg.bsfiltord   = 3; % 3rd order
+cfg.bsfiltdir   = 'twopass'; % zero-phase
+
 %%
 % exp: 'OSF_simple', 'TalKennet', 'NMSG' (Neural Markers of Shared Gaze...)
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 env = setupEnviroment('NMSG');
 addpath(env.paths.extra_func);
+
+%% Automatic Artefact dection - high amplitude artifact detection
+% GUI explaination:
+% < or > : jump to previous/next flagged segment
+% artifact: Accept Marked "red" areas as artefacts.
+% << >>: Scroll through entire recording
+% keep trial: Mark as CLEAN - False positive - Z-score wrongly flagged normal data
+% reject full: Confirm Z-score detection was correct, but rejects the FULL
+% segment (even the clean parts).
+% reject part: Draw custom artifact boundaries (drag on plot). Use if Z-score boundaries are currently wrong
+% threshold: Adjust cutoff: Change the Z-score threshold on the fly with < and >
+% stop: Done reviewing - Exit the GUI and save your corrections
+cfg = [];
+cfg.continuous                   = 'yes'; % Data is continuous (no trial boundaries)
+cfg.artfctdef.zvalue.channel     = {'all', '-eogV', '-eogH'};
+cfg.artfctdef.zvalue.cutoff      = 6; % Flag samples with |Z| > 50 as artifacts
+cfg.artfctdef.zvalue.artpadding  = 0.2; % Include 0.2s before & after artifact
+cfg.artfctdef.zvalue.zscore      = 'yes';
+cfg.artfctdef.zvalue.interactive = 'yes';
+[cfg, z_artifact] = ft_artifact_zvalue(cfg, EEG);
+
 %% Load single participant
 % skipped OSF_simple ID{1} in the OSF_simple because the ICA didn't stop
 % skipped OSF_simple ID{18} since he was very noisy.

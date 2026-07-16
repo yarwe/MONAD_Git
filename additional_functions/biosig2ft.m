@@ -1,5 +1,7 @@
-function [ftEEG] = biosig2ft(EEG)
-
+function [ftEEG] = biosig2ft(EEG, paradigm)
+    if nargin < 2
+        paradigm = '';
+    end
 
     % turn to fieldtrip data
     ftEEG = [];
@@ -29,5 +31,39 @@ function [ftEEG] = biosig2ft(EEG)
     ftEEG.cfg.dataset      = EEG.filename;                      % Store dataset filename
     ftEEG.cfg.original     = EEG;                               % Keep original EEGLAB struct for reference
     
+    % --- OSF_simple event/trigger saving ---
+    if strcmpi(paradigm, 'OSF_simple')
+
+        % Numeric code → label map (from SimpleTone_codes.txt)
+        codeMap = containers.Map( ...
+            {1,  2,    3,     4,    5,    6,    11,           12}, ...
+            {'Low_3','Mid_3','High_3','Low_9','Mid_9','High_9','Button_press','Attend_cross'} ...
+        );
+
+        nEv = length(EEG.event);
+        ev = struct('type', cell(1,nEv), 'value', cell(1,nEv), ...
+            'sample', cell(1,nEv), 'offset', cell(1,nEv), ...
+            'duration', cell(1,nEv));
+
+        for i = 1:nEv
+            code = EEG.event(i).edftype;   % numeric trigger code
+
+            if isKey(codeMap, code)
+                label = codeMap(code);
+            else
+                label = sprintf('unknown_%d', code);
+            end
+
+            ev(i).type     = label;
+            ev(i).value    = code;
+            ev(i).sample   = EEG.event(i).latency;
+            ev(i).offset   = [];
+            ev(i).duration = [];
+        end
+
+        ftEEG.cfg.event = ev;
+    end
+
+
     clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
 end

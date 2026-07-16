@@ -28,7 +28,7 @@ all_labels = {neighbours.label};
 
 % % To allow comparisons between experiments, we aim to take the same
 % % electrodes as noise baseline
-target_labels = {'FC5', 'C3', 'C5', 'CP5', 'POz', 'AFz', 'FC6', 'Cz', 'C4', 'C6', 'CP6'};
+target_labels ={'FC5', 'C3', 'C5', 'CP5', 'POz', 'AFz', 'FC6', 'Cz', 'C4', 'C6', 'CP6'};
 existing_idx = ismember(target_labels, all_labels);
 neigh_labels = target_labels(existing_idx);
 
@@ -92,7 +92,7 @@ N = length(env.data.clean_files);
 
 % EEG structure template
 strct = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {Lcfg.foi}, ...
-    'label', {env.lay.label(1:64)}, 'elec', {env.elec}, 'time', []);
+    'label', {env.lay.cfg.channel}, 'elec', {env.elec}, 'time', []); % for label- {env.lay.label(1:64)}
 counter = 0;
 % Iterate over participants
 for s = 1:N
@@ -114,14 +114,14 @@ for s = 1:N
     
     %%%%%% FIX THIS (!!)- numbers are not the only indicators for EOG/EEG types %%%%%%
 
-    % check if there are accidentaly EOG channels
-    sz = size(EEG.trial{1});
-    if sz(1) > 64
-        cfg = [];
-        cfg.channel = 1:64;
-        EEG = ft_selectdata(cfg,EEG);
-    end
-    %%%%%%
+    % % check if there are accidentaly EOG channels
+    % sz = size(EEG.trial{1});
+    % if sz(1) > 64
+    %     cfg = [];
+    %     cfg.channel = 1:64;
+    %     EEG = ft_selectdata(cfg,EEG);
+    % end
+    % %%%%%%
 
     % initiate noise variables
     noise_labels = {};
@@ -131,7 +131,7 @@ for s = 1:N
     strct.ID = ID{1};    
     LAVI = zeros(62, length(Lcfg.foi));
     n_pink_rep=20;
-    samp_rate=env.data.fsample;
+    samp_rate=Lcfg.fs;
     % Calculate LAVI for each electrode
     for e = 1:length(EEG.label)
         disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
@@ -161,9 +161,9 @@ for s = 1:N
     LAVI_arr{end+1} = strct;
 
     
-    % FFT analysis %
+    % FFT analysis % (!) yarden changed window into 5s instead of 15: cfg.length = 15;
     cfg = [];
-    cfg.length = 15;
+    cfg.length = 5;
     EEGtrl = ft_redefinetrial(cfg,EEG);
     cfg = [];
     cfg.trials = find(~cellfun(@(x) any(isnan(x(:))), EEGtrl.trial));
