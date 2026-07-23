@@ -90,6 +90,8 @@ for g = 1:numel(groups)
     if compute_peak_freq
         peakFreq = nan(nSubj, nBands);
     end
+    % [MODIFIED] Initialize totalPow to compute relative power correctly
+    totalPow = nan(nSubj, 1);
     IDs    = cell(1, nSubj);
     chanUsed = {};
 
@@ -137,7 +139,9 @@ for g = 1:numel(groups)
                 % [ADDED] Compute peak frequency if requested
                 if compute_peak_freq
                     [~, idx_max] = max(P(mask));
-                    peakFreq(s, b) = f(find(mask, idx_max, 'first') + idx_max - 1);
+                    % Get frequency of maximum power in this band
+                    f_band = f(mask);
+                    peakFreq(s, b) = f_band(idx_max);
                 end
             else
                     absPow(s, b) = NaN;
@@ -148,10 +152,11 @@ for g = 1:numel(groups)
             end
         end
 
-        % --- relative power: band / total across all bands ---
-        total = sum(absPow(s, :), 'omitnan');
-        if total > 0
-            relPow(s, :) = absPow(s, :) / total;
+        % [MODIFIED] Compute relative power: band / total across ALL frequencies (not just defined bands)
+        % This is the correct definition: relative power = band absolute power / integral of entire spectrum
+        totalPow(s) = nansum(P);  % Sum power across ALL frequencies in the spectrum
+        if totalPow(s) > 0
+            relPow(s, :) = absPow(s, :) / totalPow(s);
         end
 
         % --- ID ---

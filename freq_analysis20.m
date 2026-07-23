@@ -187,19 +187,33 @@ end
 % pcfg.noise_var          : whether to plot the pink noise simulations (LAVI only)
 % pcfg.noiseCh            : which channel's pink noise to show
 pcfg = [];
-pcfg.dependant_variable = 'fft';   % 'LAVI' or 'fft'
+pcfg.dependant_variable = 'LAVI';   % 'LAVI' or 'fft'
 pcfg.plot_groups = {'ASD','NT'};
-pcfg.chosen_ch   ={'Cz', 'C1', 'C2', 'FCz', 'FC1', 'FC2'};
+pcfg.chosen_ch   ={'Cz'}; % chosen_ch
 pcfg.noise_var   = false;            % set false to hide the pink noise (LAVI only)
 pcfg.noiseCh     = 'Cz';
 pcfg.FOI  = Lcfg.foi;
 pcfg.xfoi = [1, 90];
+pcfg.exclude_subjects = {'011301','011302','013703','104001','104101'};
 
 close all;
 [p, legend_names] = plotSpectrum(pcfg, groups);
 
 %% FFT real time 
-[durTbl, summary] = fftRecordingTime(FFT_arr, 5)
+[durTbl, summary] = fftRecordingTime(FFT_arr, 5);
+
+%% Possible channel clusters
+pari_chans={'P1', 'P2', 'Pz', 'P3', 'P4', 'CP1','CPz', 'CP2', 'CP3', 'CP4'}; % Parietal channels
+occi_chans={'O1', 'Oz', 'O2'}; % Occipital
+pari_occi_chans={'PO3', 'POz', 'PO4', 'PO7', 'PO8'}; %Parieto-Occipital
+central_chans={'Cz', 'C1', 'C2', 'C3', 'C4'};
+post_mid={'CPz', 'Pz', 'POz', 'Oz'};
+post_left={'CP3', 'P3', 'P7','TP7', 'PO7', 'O1'};
+post_right={'CP4', 'P4', 'P8','TP8', 'PO8', 'O2'};
+% According to the paper of Shen et al. (2023), "resting-state activity in children.."
+% Parietal ROI (For Low-Alpha: 8–9 Hz); 
+% Ventral / Occipital-Temporal ROI (For High-Alpha: 11–12 Hz)
+% Central ROI (For Control / Topography Checks)
 
 %% Compute relative alpha (8-13hz) and absolute and relative gamma (>30hz)
 % Following this review from 2023: "Resting-state EEG power differences in autism spectrum
@@ -210,8 +224,9 @@ close all;
 
 % --- Compute absolute & relative band power per participant, per group ---
 bpcfg = [];
-bpcfg.chosen_ch = chosen_ch;      % region of interest (central channels)
+bpcfg.chosen_ch = post_right;      % region of interest (central channels)
 bpcfg.fmax      = max(foi);       % cap the open gamma band to the analysis range (90 Hz)
+bpcfg.compute_peak_freq = true;
 
 % NOTE: gamma (30-fmax) spans the 60 Hz line-noise frequency; if line noise is
 % not fully removed, lower fmax (e.g. 45) or notch it before trusting gamma power.
@@ -219,46 +234,96 @@ bandPow = computeBandPower(bpcfg, groups);        % both groups (ASD, NT)
 % For a single group only:
 % bandPow = computeBandPower(bpcfg, groups(strcmp({groups.name}, 'ASD')));
 
-% --- Plot distributions per band and report group statistics ---
+%% --- Plot distributions of power per band and report group statistics ---
 % One figure per band; shows absolute & relative power for each group with
 % mean +/- SD, Cohen's d, t-value and p-value (Welch's two-sample t-test).
-ppcfg = [];
-ppcfg.bands   = 'all';            % or e.g. 'alpha', or {'alpha','gamma'}
-ppcfg.measure = 'both';           % 'abs', 'rel', or 'both'
-ppcfg.colors  = [env.plots.lineASD; env.plots.lineNT];
-bandStats = plotBandPower(ppcfg, bandPow);
 
 % Example: only alpha and gamma, relative power, single group:
 % ppcfg.bands = {'alpha','gamma'}; ppcfg.measure = 'rel';
 % plotBandPower(ppcfg, bandPow(strcmp({bandPow.name}, 'ASD')));
 
-% With outliers
-ppcfg.exclude_subjects = {'102901', '104001', '101801'};
+ppcfg = [];
+ppcfg.bands   = 'all';            % or e.g. 'alpha', or {'alpha','gamma'}
+ppcfg.measure = 'both';           % 'abs', 'rel', or 'both'
+ppcfg.colors  = [env.plots.lineASD; env.plots.lineNT];
+ppcfg.show_peak_freq = false;
 bandStats = plotBandPower(ppcfg, bandPow);
 
+% % With outliers
+% ppcfg.exclude_subjects = {'102901', '104001', '101801'};
+% bandStats = plotBandPower(ppcfg, bandPow);
+
+%% Peak Frequency
+
+
+
+[stats] = test_peak_freq_difference(bandPow);
+
+% Overlayed histogram of alpha peak frequencies
+cfg = [];
+% cfg.exclude_subjects = {'030801'};
+cfg.type = 'peak_freq';
+cfg.band = 'alpha';  % or use index: 3
+cfg.method = 'density'; % 'histogram' or 'density'
+% cfg.show_individual_subjects = true;  % Shows each subject as a dot
+
+% Density options:
+% 'kde' - Smooth curves (default, has artifacts)
+% 'violin' - Symmetric violin plots
+% 'ecdf' - Cumulative dist (NO smoothing!)
+% 'rug' - Individual subjects on line- lookss bad, not recommended
+% 'strip' - Scatter with jitter
+cfg.density_method = 'kde'; 
+cfg.nbins = 3;      % optional
+plot_peak_dist(cfg, bandPow); 
+
+
+
 %% plot signle subject LAVI with noise
-figure;
-ID = 10;
-ch = 'POz';
-chIdx1 = find(strcmp(ch,env.lay.label))
-chIdx2 = find(strcmp(ch,LAVI_arr{1}.noise.labels))
-maxNoise = max(LAVI_arr{ID}.noise.noise{chIdx2}, [], 1);  % Max across simulations per frequency
-minNoise = min(LAVI_arr{ID}.noise.noise{chIdx2}, [], 1);  % Min across simulations per frequency
+for id=1:length(LAVI_arr)
+    figure;
+    ch = 'Cz';
+    chIdx1 = find(strcmp(ch,env.lay.label));
+    chIdx2 = find(strcmp(ch,LAVI_arr{1}.noise.labels));
+    maxNoise = max(LAVI_arr{id}.noise.noise{chIdx2}, [], 1);  % Max across simulations per frequency
+    minNoise = min(LAVI_arr{id}.noise.noise{chIdx2}, [], 1);  % Min across simulations per frequency
+    
+    plot(Lcfg.foi, LAVI_arr{id}.powspctrm(chIdx1,:)  , 'LineWidth', 3, 'Color', env.plots.lineASD);
+    % hold on
+    % plot(Lcfg.foi, LAVI_arr{ID}.noise.noise{chIdx2});
+    % hold on
+    % plot(Lcfg.foi, maxNoise, 'LineWidth', 1.5, 'Color', 'black');
+    % hold on
+    % plot(Lcfg.foi, minNoise, 'LineWidth', 1.5, 'Color', 'black');
+    %ylim([0.32, 0.55])
+    % set(gca, 'XScale', 'log');
+    xlim([foi(1), foi(end)]);
+    % xt = logspace(log10(foi(1)), log10(foi(2)), 12);
+    % xt = round(xt, 1);  % round to 1 decimal place
+    % xticks(xt);
+    % xticklabels(string(xt));
+    % xtickangle(0)
+    xlabel('Frequency (Hz)'); ylabel('LAVI');
+    title(sprintf('Subject %s',LAVI_arr{id}.ID));
+    ylim([0 0.9]);
+end
 
-plot(Lcfg.foi, LAVI_arr{ID}.powspctrm(chIdx1,:)  , 'LineWidth', 3, 'Color', env.plots.lineASD);
-hold on
-plot(Lcfg.foi, LAVI_arr{ID}.noise.noise{chIdx2});
-hold on
-plot(Lcfg.foi, maxNoise, 'LineWidth', 1.5, 'Color', 'black');
-hold on
-plot(Lcfg.foi, minNoise, 'LineWidth', 1.5, 'Color', 'black');
-%ylim([0.32, 0.55])
-set(gca, 'XScale', 'log');
-xlim([xfoi(1), xfoi(end)]);
-xt = logspace(log10(xfoi(1)), log10(xfoi(2)), 12);
-xt = round(xt, 1);  % round to 1 decimal place
-xticks(xt);
-xticklabels(string(xt));
-xtickangle(0)
-
-
+%% plot signle subject FFT
+for id=1 %:length(FFT_arr)
+    figure;
+    ch = 'Cz';
+    chIdx1 = find(strcmp(ch,env.lay.label));
+    
+    plot(Lcfg.foi, FFT_arr{id}.powspctrm(chIdx1,:)  , 'LineWidth', 3, 'Color', env.plots.lineASD);
+   
+    set(gca, 'XScale', 'log', 'YScale', 'log');
+    xlim([foi(1), foi(end)]);
+    % xt = logspace(log10(foi(1)), log10(foi(2)), 12);
+    % xt = round(xt, 1);  % round to 1 decimal place
+    % xticks(xt);
+    % xticklabels(string(xt));
+    % xtickangle(0)
+    xlabel('Log (Frequency (Hz))'); ylabel('FFT (log)');
+    title(sprintf('Subject %s',FFT_arr{id}.ID{1}));
+    ylim([10^-3 10^1]);
+end

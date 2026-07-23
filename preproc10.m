@@ -133,6 +133,7 @@ cfg = [];
 cfg.channel = 'eeg';
 EEG_ds = ft_selectdata(cfg, EEG_ds);
 
+
 % For the main cleaning
 [eeg_Dat_clean, zaplineConfig, analyticsResults, plothandles] = ...
         clean_data_with_zapline_plus(EEG_ds.trial{1}, EEG_ds.fsample,maxfreq=EEG_ds.fsample/2);
@@ -154,7 +155,6 @@ clear zaplineConfig analyticsResults plothandles
 %% basic preproc: demean, detrend, and filters
 % for ICA - create a copy of 1hz high pass filter threshold (instead of 0.5)
 clc;
-close all;
 
 % Set filter parameters
 high_pass=0.5; high_pass_ica=1; low_pass=100;
@@ -337,6 +337,11 @@ eye_blinks_bef_af_ICA(s, chans_blinks, thres_lowpass_eyeblink_detect,pEEG_aft_ar
 % See traces of frontal channels- how are they changed after ICA?
 time_sec_fps=5;
 nsamples_fps=min(EEG_ds.fsample * time_sec_fps, EEG_ds.sampleinfo(2));
+
+if sum(isnan(pEEG_aft_art_rej.trial{1}(1,1:nsamples_fps))) > (nsamples_fps/2)
+    nsamples_fps=nsamples_fps*5;
+end
+
 for chan=chans_blinks
     plot_signal_comparison(pEEG_aft_art_rej, dat_after_ICA, ID ,1,chan,{'Before ICA','After ICA'},[1 nsamples_fps])
 end
@@ -395,8 +400,8 @@ csv_addCol16(env, log_file, ID, {'method_interpolate'}, ...
     {method_interpolate});
 
 %% View the data again for final Manual Epoch removal
-
-data_brow_info2=open_databrow(data_repaired,'title',"Mark visible artifacts Manually");
+clc; close all;
+data_brow_info2=open_databrow(data_repaired,'title','Mark visible artifacts Manually');
 man_artf2=data_brow_info2.artfctdef.visual.artifact;
 if ~isempty(man_artf2)
     art_epochs2=concat_man_artf(man_artf2,fs_ds,0.05);
@@ -470,6 +475,7 @@ dat_final = ft_preprocessing(cfg, data_repaired_aft_art);
 
 % View final
 open_databrow(dat_final);
+plot_var_all_chans(ID, dat_final, nEEG, 'window_sec', 0);
 
 % Date
 date_t = datetime("today", "Format", "dd/MM/yyyy");
@@ -534,3 +540,4 @@ save([env.paths.prev_dat ID '_prev_dat'], ...
     "data_repaired","data_repaired_aft_art","eeg_postZap", '-v7.3', '-nocompression');
 
 disp('All Data Saved!');
+figure;

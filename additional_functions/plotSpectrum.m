@@ -17,9 +17,14 @@ function [p, legend_names] = plotSpectrum(cfg, groups)
 %   cfg.noiseCh            : (optional, LAVI only) channel label for the pink-noise
 %                            trace. Default 'Cz'.
 %   cfg.newfig             : (optional) logical, open a new figure. Default true.
+%   cfg.exclude_subjects   : (optional) subject IDs to exclude from grand average. Accepts:
+%                            - numbers: [101, 102, 103]
+%                            - cell of strings: {'030801', '030802'} or {'A1', 'A2'}
+%                            - empty: no exclusions (default)
 %
 %   groups : struct array with fields .name, .color, and (per dependent variable)
-%            .GA_LAVI/.data_LAVI or .GA_fft/.data_fft.
+%            .GA_LAVI/.data_LAVI or .GA_fft/.data_fft. Each data element should have
+%            .ID field with subject ID.
 %
 % OUTPUTS
 %   p            : line handles used for the legend.
@@ -58,6 +63,11 @@ end
 if ~isfield(cfg, 'newfig') || isempty(cfg.newfig)
     cfg.newfig = true;
 end
+% [ADDED] Subject exclusion option
+if ~isfield(cfg, 'exclude_subjects') || isempty(cfg.exclude_subjects)
+    cfg.exclude_subjects = [];
+end
+
 % Pink noise only applies to LAVI; force off for fft.
 isLAVI = strcmp(cfg.dependant_variable, 'LAVI');
 if ~isfield(cfg, 'noise_var') || isempty(cfg.noise_var)
@@ -118,6 +128,18 @@ for i = 1:numel(plot_groups)
         dat = groups(g_idx).data_fft;
     end
 
+    % [ADDED] Handle subject exclusion
+    dat_filtered = dat;  % Copy original data
+    n_excluded = 0;
+    if ~isempty(cfg.exclude_subjects)
+        dat_filtered = filterExcludeSubjects(dat, cfg.exclude_subjects);
+        n_excluded = numel(dat) - numel(dat_filtered);
+        if n_excluded > 0
+            fprintf('Group "%s": Excluded %d subject(s) from grand average\n', ...
+                groups(g_idx).name, n_excluded);
+        end
+    end
+
     % Get chosen channels
     [~, chIdx] = ismember(chosen_ch, G.label(:,1));
     chIdx = chIdx(chIdx > 0);
@@ -128,10 +150,16 @@ for i = 1:numel(plot_groups)
 
     % ----- Main line -----
     p(end+1) = plot(FOI, EA.powspctrm, 'LineWidth', 2.5, 'Color', clr); %#ok<AGROW>
-    legend_names{end+1} = sprintf('%s, N=%d', groups(g_idx).name, numel(dat)); %#ok<AGROW>
+    % [MODIFIED] Update legend to show final N after exclusion
+    N_final = numel(dat_filtered);
+    if n_excluded > 0
+        legend_names{end+1} = sprintf('%s, N=%d (%d excluded)', groups(g_idx).name, N_final, n_excluded); %#ok<AGROW>
+    else
+        legend_names{end+1} = sprintf('%s, N=%d', groups(g_idx).name, N_final); %#ok<AGROW>
+    end
 
     % ----- SE band -----
-    N   = numel(dat);
+    N   = N_final;
     err = EA.sd / sqrt(N);
     fill([FOI, fliplr(FOI)], ...
         [EA.powspctrm - err, fliplr(EA.powspctrm + err)], ...
@@ -158,4 +186,56 @@ xtickangle(0);
 axis square;
 % Legend
 legend(p, legend_names, 'Location', 'northwest');
+end
+
+% ======================================================================= %
+% [ADDED] Helper function to filter and exclude specific subjects
+function dat_filtered = filterExcludeSubjects(dat, exclude_subjects)
+% Filter data by excluding specified subject IDs
+% Input:
+%   dat              : cell array of FFT/LAVI struct, each with .ID field
+%   exclude_subjects : subject IDs to exclude (numbers or strings)
+% Output:
+%   dat_filtered     : filtered data with excluded subjects removed
+
+% Convert exclude_subjects to cell array of strings for flexible matching
+exclude_list = exclude_subjects;
+if isnumeric(exclude_list)
+    exclude_list = cellfun(@num2str, num2cell(exclude_list), 'UniformOutput', false);
+elseif ischar(exclude_list)
+    exclude_list = {exclude_list};
+elseif iscell(exclude_list)
+    % Convert to strings if needed
+    exclude_list = cellfun(@(x) iif(isnumeric(x), num2str(x), x), exclude_list, 'UniformOutput', false);
+end
+
+% Find subjects to keep
+keep_idx = true(numel(dat), 1);
+for i = 1:numel(dat)
+    subj_id = dat{i}.ID;
+    % Handle cell ID
+    if iscell(subj_id)
+        subj_id = subj_id{1};
+    end
+    % Convert to string
+    subj_id_str = char(string(subj_id));
+
+    % Check if this subject should be excluded
+    if any(strcmp(subj_id_str, exclude_list))
+        keep_idx(i) = false;
+    end
+end
+
+% Return filtered data
+dat_filtered = dat(keep_idx);
+end
+
+% ======================================================================= %
+% [ADDED] Inline if function (helper)
+function result = iif(condition, true_val, false_val)
+if condition
+    result = true_val;
+else
+    result = false_val;
+end
 end

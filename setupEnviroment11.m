@@ -75,7 +75,7 @@ if ~exist(exp_folder, 'dir')
     env.paths.clean     = [exp_folder 'clean\'];
     env.paths.ICApng    = [exp_folder 'ICApng\'];
     env.paths.ica_comp = [exp_folder 'ica_comp\'];
-    env.paths.prev_dat = ['D:\MONAD ASD project\' exp '\prev_dat\'];
+    env.paths.prev_dat =['D:\MONAD ASD project\' exp '\prev_dat\']; 
     % % Create the directories
     % mkdir(env.paths.auto);
     % mkdir(env.paths.manual);
