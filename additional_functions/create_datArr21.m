@@ -112,8 +112,6 @@ for s = 1:N
         EEG = tmp.(fieldName{1});
     end
     
-    %%%%%% FIX THIS (!!)- numbers are not the only indicators for EOG/EEG types %%%%%%
-
     % % check if there are accidentaly EOG channels
     % sz = size(EEG.trial{1});
     % if sz(1) > 64
@@ -129,11 +127,11 @@ for s = 1:N
 
     % LAVI analysis %
     strct.ID = ID{1};    
-    LAVI = zeros(62, length(Lcfg.foi));
+    LAVI = zeros(env.nEEG, length(Lcfg.foi));
     n_pink_rep=20;
     samp_rate=Lcfg.fs;
     % Calculate LAVI for each electrode
-    for e = 1:length(EEG.label)
+    for e =1:length(EEG.label)
         disp(['Participant: '  num2str(s)  '/' num2str(N) '  ;  ID: ' char(ID) '  ;  Electrode: ' num2str(e)]);
         LAVI(e,:) = Prepare_LAVI(Lcfg, EEG.trial{1}(e,:));
         if ismember(EEG.label{e}, neigh_labels)
@@ -174,7 +172,7 @@ for s = 1:N
     fftstrct = ft_freqanalysis(Fcfg, EEGtrl_clean);
     fftstrct.num_win = length(EEGtrl.trial);
     fftstrct.rem_win =  fftstrct.num_win - length(cfg.trials);
-    fftstrct.ID = ID;
+    fftstrct.ID = ID{1};
     fftstrct.cfg.previous = [];
     FFT_arr{end+1} = fftstrct;
     

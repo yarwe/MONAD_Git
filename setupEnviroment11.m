@@ -144,10 +144,10 @@ elseif strcmp('TalKennet', exp)
     env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
     env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
     env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
-    env.paths.prev_dat = [env.paths.preproc 'prev_dat\'];
+    env.paths.prev_dat =['D:\MONAD ASD project\' exp '\prev_dat\'];
     env.paths.ft_path = ft_path;
     
-    env.lay  = load([maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\TK_customLay.mat']);
+    env.lay  =load('D:\MONAD ASD project\TalKennet\NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\TK_customLay.mat'); % load([maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\TK_customLay.mat']);
     env.lay  = env.lay.layout;
     % Fix Iz- written as IZ and later not recognized as EEG channel
     IZ_ind=find(strcmp(env.lay.label,'IZ'));

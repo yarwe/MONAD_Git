@@ -22,6 +22,12 @@ function [bandPow] = computeBandPower(cfg, groups)
 %                           for restricting the spectrum. Default = max(data.freq).
 %   cfg.compute_peak_freq : (optional) logical, default false. If true, compute peak
 %                           frequency (frequency with max power) for each band/subject.
+%   cfg.overrideBandName  : (optional) override a single band by name (e.g., 'alpha').
+%                           Requires cfg.overrideBandLo and cfg.overrideBandHi.
+%   cfg.overrideBandIndex : (optional) override a single band by index (e.g., 3 for alpha).
+%                           Requires cfg.overrideBandLo and cfg.overrideBandHi.
+%   cfg.overrideBandLo    : (optional) new lower boundary (Hz) for overridden band.
+%   cfg.overrideBandHi    : (optional) new upper boundary (Hz) for overridden band.
 %
 %   groups                : struct array with fields:
 %                             .name     - group name (char)
@@ -40,11 +46,23 @@ function [bandPow] = computeBandPower(cfg, groups)
 %     .IDs         {1 x nSubj} participant IDs
 %     .chan        channels actually found and averaged
 %
-% Example (both groups):
+% Examples:
+%   % Compute with default bands
 %   cfg = []; cfg.chosen_ch = chosen_ch;
 %   bandPow = computeBandPower(cfg, groups);
-% Example (one group only):
-%   bandPow = computeBandPower(cfg, groups(1));
+%
+%   % Override alpha band by name
+%   cfg.overrideBandName = 'alpha';
+%   cfg.overrideBandLo = 7;    % Change from 8 to 7 Hz
+%   cfg.overrideBandHi = 14;   % Change from 13 to 14 Hz
+%   bandPow = computeBandPower(cfg, groups);
+%
+%   % Override alpha band by index (3 = alpha)
+%   cfg = []; cfg.chosen_ch = chosen_ch;
+%   cfg.overrideBandIndex = 3;
+%   cfg.overrideBandLo = 8.5;
+%   cfg.overrideBandHi = 12.5;
+%   bandPow = computeBandPower(cfg, groups);
 
 % ---- Defaults ----
 if ~isfield(cfg, 'chosen_ch') || isempty(cfg.chosen_ch)
@@ -69,6 +87,34 @@ else
     bands = cfg.bands;
 end
 nBands = numel(bands);
+
+% [ADDED] Allow overriding a single band's boundaries without providing all bands
+if isfield(cfg, 'overrideBandName') && ~isempty(cfg.overrideBandName)
+    % Override by band name (e.g., 'alpha')
+    bandIdx = find(strcmp({bands.name}, cfg.overrideBandName));
+    if isempty(bandIdx)
+        error('Band "%s" not found. Available bands: %s', cfg.overrideBandName, strjoin({bands.name}, ', '));
+    end
+    if ~isfield(cfg, 'overrideBandLo') || ~isfield(cfg, 'overrideBandHi')
+        error('Must provide cfg.overrideBandLo and cfg.overrideBandHi to override band "%s"', cfg.overrideBandName);
+    end
+    bands(bandIdx).lo = cfg.overrideBandLo;
+    bands(bandIdx).hi = cfg.overrideBandHi;
+    fprintf('Overriding band "%s": [%.1f %.1f] Hz\n', cfg.overrideBandName, cfg.overrideBandLo, cfg.overrideBandHi);
+
+elseif isfield(cfg, 'overrideBandIndex') && ~isempty(cfg.overrideBandIndex)
+    % Override by band index (e.g., 3 for alpha)
+    bandIdx = cfg.overrideBandIndex;
+    if bandIdx < 1 || bandIdx > nBands
+        error('Band index %d out of range [1 %d]', bandIdx, nBands);
+    end
+    if ~isfield(cfg, 'overrideBandLo') || ~isfield(cfg, 'overrideBandHi')
+        error('Must provide cfg.overrideBandLo and cfg.overrideBandHi to override band %d', bandIdx);
+    end
+    bands(bandIdx).lo = cfg.overrideBandLo;
+    bands(bandIdx).hi = cfg.overrideBandHi;
+    fprintf('Overriding band %d ("%s"): [%.1f %.1f] Hz\n', bandIdx, bands(bandIdx).name, cfg.overrideBandLo, cfg.overrideBandHi);
+end
 
 % ---- Loop over groups ----
 % [MODIFIED] Added 'peakFreq' field to struct

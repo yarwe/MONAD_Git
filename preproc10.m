@@ -1,4 +1,4 @@
-%% Clear all and set main folder
+%% Clear all 
 clearvars -except env nsubjs
 clc; close all;
 
@@ -77,7 +77,7 @@ open_databrow(EEG);
 
 % % Power spectrum of raw data of chosen channels
 % Channels where the line noise is most visible are usually O1,O2
-chans_plot = choose_chans(EEG,'plotted');
+chans_plot = choose_chans(env,'plotted',nEEG);
 plot_spect_chans(EEG,fs,s,chans_plot)
 
 % Overlayed- all channels
@@ -203,7 +203,7 @@ csv_addCol16(env, log_file, ID,...
 %% Verify artifact epochs and state duration etc.
 % First, verify
 if ~isempty(art_1)
-    art_1_verified = verify_art_before_rem2(ID, pEEG, art_1, 'context_sec', 2);
+    art_1_verified = verify_art_before_rem(ID, pEEG, art_1, 'context_sec', 2);
     % Update
     art_1=art_1_verified;
 
@@ -261,7 +261,7 @@ fprintf('Previous Outlier Channels due to extreme variance: %s\n', strjoin(out_l
 open_databrow(pEEG_aft_art, 'title','Look at suspected channels','nchan',30);
 
 
-[rej_chans_num, rej_chans_lab] = choose_chans(EEG_ds,'rejected');
+[rej_chans_num, rej_chans_lab] = choose_chans(env,'rejected',nEEG);
 rej_chans_str = strjoin(rej_chans_lab, ',');
 csv_addCol16(env, log_file, ID, {'rej_chans'},{rej_chans_str});
 clear rej_chans_str
@@ -275,6 +275,7 @@ cfg.channel = [{'all'}, strcat('-', rej_chans_lab(:)')];   % {'all','-FC3',...}
 pEEG_aft_art_ica = ft_selectdata(cfg, pEEG_aft_art_ica);
 pEEG_aft_art_rej=ft_selectdata(cfg, pEEG_aft_art);
 chans_ind_af_rej=find(ismember(pEEG_aft_art.label,pEEG_aft_art_ica.label));
+plot_var_all_chans(ID, pEEG_aft_art_rej, length(chans_ind_af_rej), 'outlier_methods', {'zscore'}, 'window_sec', 0);
 
 % Run ICA
 cfg = [];
@@ -311,7 +312,7 @@ bad_components=input('Which Component number do you wish to reject? e.g., 2, [1,
 % % Reject the components
 % cfg = [];
 % cfg.component = bad_components;
-% dat_after_ICA1h = ft_rejectcomponent(cfg, comp, EEG_for_ica);
+% dat_after_ICA1h = ft_rejectcomponent(cfg, comp, pEEG_aft_art_ica);
 
 % Use the 0.5hz high-pass and the not downsampled data
 cfg           = [];

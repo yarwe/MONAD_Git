@@ -23,7 +23,7 @@ function [p, legend_names] = plotSpectrum(cfg, groups)
 %                            - empty: no exclusions (default)
 %
 %   groups : struct array with fields .name, .color, and (per dependent variable)
-%            .GA_LAVI/.data_LAVI or .GA_fft/.data_fft. Each data element should have
+%            .ga_lavi/.data_lavi or .ga_fft/.data_fft. Each data element should have
 %            .ID field with subject ID.
 %
 % OUTPUTS
@@ -84,7 +84,7 @@ noiseCh     = cfg.noiseCh;
 
 % Find noise channel index (only needed for LAVI + noise)
 if plot_noise
-    noiseChIdx = find(strcmp(noiseCh, groups(1).GA_LAVI.noise.labels));
+    noiseChIdx = find(strcmp(noiseCh, groups(1).ga_lavi.noise.labels));
 end
 
 % --- Plots Setup --- %
@@ -93,38 +93,16 @@ hold on;
 p = [];            % Line handles (for legend)
 legend_names = {}; % Legend text
 
-% --- NOISE PLOTTING (LAVI only, optional) --- %
-if plot_noise
-    % Pink noise reference line (use the first plotted group's grand-average noise)
-    ref_idx = find(strcmp({groups.name}, plot_groups{1}));
-    G_ref   = groups(ref_idx).GA_LAVI;
-    h_noise = plot(FOI, G_ref.noise.noise{noiseChIdx}, ...
-        'Color', [0.8 0.2 0.5], 'LineWidth', 3);
-    p(end+1) = h_noise(1);
-    uistack(h_noise, 'top');
-    legend_names{end+1} = 'Pink Noise';
-    % Envelope (min/max) across plotted groups
-    allNoise = [];
-    for i = 1:numel(plot_groups)
-        g_idx = find(strcmp({groups.name}, plot_groups{i}));
-        allNoise = cat(3, allNoise, groups(g_idx).GA_LAVI.noise.noise{noiseChIdx});
-    end
-    maxNoise = max(allNoise, [], 3);
-    minNoise = min(allNoise, [], 3);
-    plot(FOI, maxNoise, 'Color', [0 0 0], 'LineWidth', 1.1, 'HandleVisibility', 'off');
-    plot(FOI, minNoise, 'Color', [0 0 0], 'LineWidth', 1.1, 'HandleVisibility', 'off');
-end
-
-% --- Plot Groups --- %
+% --- Plot Groups (with per-group pink noise simulations) --- %
 for i = 1:numel(plot_groups)
     % Which row corresponds to this group name?
     g_idx = find(strcmp({groups.name}, plot_groups{i}));
     % Select correct dependent variable struct
     if isLAVI
-        G   = groups(g_idx).GA_LAVI;
-        dat = groups(g_idx).data_LAVI;
+        G   = groups(g_idx).ga_lavi;
+        dat = groups(g_idx).data_lavi;
     else
-        G   = groups(g_idx).GA_fft;
+        G   = groups(g_idx).ga_fft;
         dat = groups(g_idx).data_fft;
     end
 
@@ -148,7 +126,32 @@ for i = 1:numel(plot_groups)
     EA.sd = nanmean(G.sd(chIdx,:), 1);
     clr = groups(g_idx).color;
 
-    % ----- Main line -----
+    % ----- PINK NOISE SIMULATIONS FOR THIS GROUP (if LAVI) ----- %
+    if plot_noise
+        % Get all 20 pink noise simulations (20 x 179 matrix)
+        noise_all = G.noise.noise{noiseChIdx};  % Should be 20 x 179 (simulations x frequencies)
+
+        % Make darker version of group color for pink noise
+        clr_dark = clr * 0.5;  % Darker shade (50% of original RGB)
+
+        % Plot all 20 simulations as thin lines with group color (darker)
+        % noise_all is (20 simulations) x (179 frequencies)
+        % Use FOI as the frequency vector (matches the 179 columns)
+        FOI_row = FOI(:)';
+        for sim = 1:size(noise_all, 1)
+            if sim == 1
+                % First simulation: add to legend
+                h_noise = plot(FOI_row, noise_all(sim, :), 'Color', clr_dark, 'LineWidth', 0.7);
+                p(end+1) = h_noise(1);
+                legend_names{end+1} = sprintf('%s - Pink Noise (N=%d sims)', groups(g_idx).name, size(noise_all, 1));
+            else
+                % Other simulations: just plot, no legend entry
+                plot(FOI_row, noise_all(sim, :), 'Color', clr_dark, 'LineWidth', 0.7, 'HandleVisibility', 'off');
+            end
+        end
+    end
+
+    % ----- Main LAVI/FFT line -----
     p(end+1) = plot(FOI, EA.powspctrm, 'LineWidth', 2.5, 'Color', clr); %#ok<AGROW>
     % [MODIFIED] Update legend to show final N after exclusion
     N_final = numel(dat_filtered);
@@ -158,12 +161,13 @@ for i = 1:numel(plot_groups)
         legend_names{end+1} = sprintf('%s, N=%d', groups(g_idx).name, N_final); %#ok<AGROW>
     end
 
-    % ----- SE band -----
+    % ----- 95% CI band for LAVI/FFT (±1.96*SE) -----
     N   = N_final;
-    err = EA.sd / sqrt(N);
+    SE = EA.sd / sqrt(N);
+    ci_95 = 1.96 * SE;  % 95% confidence interval
     fill([FOI, fliplr(FOI)], ...
-        [EA.powspctrm - err, fliplr(EA.powspctrm + err)], ...
-        clr, 'FaceAlpha', 0.15, 'EdgeAlpha', 0.2, 'HandleVisibility', 'off');
+        [EA.powspctrm - ci_95, fliplr(EA.powspctrm + ci_95)], ...
+        clr, 'FaceAlpha', 0.2, 'EdgeAlpha', 0.3, 'HandleVisibility', 'off');
 end
 
 % --- AXES, LABELS, LEGEND ---

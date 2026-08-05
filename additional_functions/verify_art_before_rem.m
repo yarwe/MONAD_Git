@@ -1,4 +1,4 @@
-function artif_info = verify_art_before_rem(ID, EEG, art_1, varargin)
+function [artif_info, orig_idx] = verify_art_before_rem(ID, EEG, art_1, varargin)
 % VERIFY_ART_BEFORE_REM  Re-review previously flagged artifact epochs on
 % (further) preprocessed data, to check whether the preprocessing already
 % resolved the issue so the epoch no longer needs to be removed.
@@ -27,6 +27,13 @@ function artif_info = verify_art_before_rem(ID, EEG, art_1, varargin)
 %   'fs'           - sampling frequency in Hz (default: EEG.fsample)
 %   'include_kept' - also re-show rows where art_1.Decision == 'keep'
 %                    (default false, since those don't need re-verifying)
+%   'hide_channels'- channel(s) to hide from the plot on start-up, given as
+%                    a label / cell array of labels or numeric indices into
+%                    EEG.label (default {} = show all). This is display-only:
+%                    hidden channels can still be flagged for removal and are
+%                    unaffected in the output table. You can also change which
+%                    channels are hidden interactively via the 'Hide channels…'
+%                    button (select the channels to remove from the view).
 %
 % Notes:
 %   Epoch windows are carried over using TIME (seconds), not raw sample
@@ -43,6 +50,11 @@ function artif_info = verify_art_before_rem(ID, EEG, art_1, varargin)
 %   artif_info - table, same format as elec_choose_artf's output, one row
 %                per reviewed epoch, seeded with the previous Decision /
 %                RemoveChannels / removal-window as the starting point.
+%   orig_idx   - row indices into the art_1 you passed in, one per row of
+%                artif_info (in the same order). Use it to merge the
+%                re-reviewed rows back into the original table:
+%                   [art_1_v, idx] = verify_art_before_rem(ID, EEG, art_1);
+%                   art_1(idx, :)  = art_1_v;
 
 p = inputParser;
 addParameter(p, 'context_sec',  10);
@@ -50,13 +62,15 @@ addParameter(p, 'chan_range',   50);
 addParameter(p, 'chan_scale',   []);
 addParameter(p, 'fs',           []);
 addParameter(p, 'include_kept', false);
+addParameter(p, 'hide_channels', {});
 parse(p, varargin{:});
 
-context_sec  = p.Results.context_sec;
-chan_range   = p.Results.chan_range;
-chan_scale   = p.Results.chan_scale;
-fs           = p.Results.fs;
-include_kept = p.Results.include_kept;
+context_sec   = p.Results.context_sec;
+chan_range    = p.Results.chan_range;
+chan_scale    = p.Results.chan_scale;
+fs            = p.Results.fs;
+include_kept  = p.Results.include_kept;
+hide_channels = p.Results.hide_channels;
 
 if isempty(fs)
     fs = EEG.fsample;
@@ -71,8 +85,19 @@ if isempty(chan_scale)
     chan_scale = 2 * chan_range;
 end
 
-if ~include_kept
-    art_1 = art_1(~strcmp(art_1.Decision, 'keep'), :);
+%% Channel visibility (display-only). true = shown in the plot.
+chan_visible = true(1, nChans);
+hide_idx = resolve_channels(hide_channels, labels);
+chan_visible(hide_idx) = false;
+if ~any(chan_visible)   % never hide everything
+    chan_visible(:) = true;
+end
+
+if include_kept
+    orig_idx = (1:height(art_1))';
+else
+    orig_idx = find(~strcmp(art_1.Decision, 'keep'));
+    art_1    = art_1(orig_idx, :);
 end
 if isempty(art_1)
     error('verify_art_before_rem:noEpochs', ...
@@ -91,6 +116,9 @@ chan_colors = palette(mod((1:nChans)-1, size(palette,1))+1, :);
 
 h_highlight = [];   % handle for currently highlighted line
 h_chan_tooltip = []; % text annotation showing channel name
+
+cur_visible = find(chan_visible);   % visible channel indices for the last render
+cur_offset  = zeros(1, nChans);     % y-baseline per channel for the last render
 
 %% Rebuild win_data (epoch boundaries) from art_1's TIME columns, mapped
 % into the current EEG's sample space.
@@ -144,8 +172,13 @@ PX = 0.68;
 PW = 0.30;
 
 h_info = uicontrol(fig, 'Style', 'text', ...
-    'Units', 'normalized', 'Position', [PX 0.88 PW 0.10], ...
+    'Units', 'normalized', 'Position', [PX 0.925 0.16 0.055], ...
     'HorizontalAlignment', 'left', 'FontSize', 10);
+
+uicontrol(fig, 'Style', 'pushbutton', 'String', 'Hide channels…', ...
+    'Units', 'normalized', 'Position', [PX+0.17 0.935 0.13 0.045], ...
+    'FontSize', 9, 'TooltipString', 'Choose which channels to hide from the view (display only)', ...
+    'Callback', @choose_view_channels);
 
 uicontrol(fig, 'Style', 'text', 'String', 'Rejection decision:', ...
     'Units', 'normalized', 'Position', [PX 0.81 PW 0.05], ...
@@ -255,15 +288,25 @@ if isvalid(fig), close(fig); end
         h_chan_tooltip = [];
         cla(ax); hold(ax, 'on');
 
-        for ch = nChans:-1:1
-            offset = (nChans - ch) * chan_scale;
-            plot(ax, t_vec, seg(ch,:) + offset, ...
+        % Only the visible channels are drawn, re-packed so there are no gaps
+        % where hidden channels would have been. cur_offset/cur_visible are
+        % shared so on_click can map clicks back to channels.
+        cur_visible = find(chan_visible);   % ascending; ch=1 is the top label
+        nVis        = numel(cur_visible);
+        cur_offset  = nan(1, nChans);
+        for p = 1:nVis
+            cur_offset(cur_visible(p)) = (nVis - p) * chan_scale;
+        end
+
+        for p = nVis:-1:1
+            ch = cur_visible(p);
+            plot(ax, t_vec, seg(ch,:) + cur_offset(ch), ...
                 'Color', chan_colors(ch,:), 'LineWidth', 0.8, ...
                 'UserData', ch);
         end
 
         y_lo = -chan_range;
-        y_hi = (nChans - 1) * chan_scale + chan_range;
+        y_hi = (nVis - 1) * chan_scale + chan_range;
 
         art_t1 = (wd.SampStart - 1) / fs;
         art_t2 =  wd.SampEnd       / fs;
@@ -282,8 +325,8 @@ if isvalid(fig), close(fig); end
         end
 
         set(ax, ...
-            'YTick',      (0 : nChans-1) * chan_scale, ...
-            'YTickLabel', labels(nChans:-1:1), ...
+            'YTick',      (0 : nVis-1) * chan_scale, ...
+            'YTickLabel', labels(cur_visible(nVis:-1:1)), ...
             'FontSize',   7, ...
             'TickLabelInterpreter', 'none');
         xlabel(ax, 'Time (s)');
@@ -322,6 +365,24 @@ if isvalid(fig), close(fig); end
 
     function s = onoff(tf)
         if tf, s = 'on'; else, s = 'off'; end
+    end
+
+    % Resolve a channel spec (labels, cell of labels, or numeric indices)
+    % into row indices of `lbls`. Unknown labels / out-of-range indices are
+    % silently ignored.
+    function idx = resolve_channels(spec, lbls)
+        if isempty(spec)
+            idx = [];
+        elseif isnumeric(spec)
+            idx = spec(spec >= 1 & spec <= numel(lbls));
+            idx = idx(:)';
+        else
+            if ischar(spec) || isstring(spec)
+                spec = cellstr(spec);
+            end
+            [~, idx] = ismember(spec, lbls);
+            idx = idx(idx > 0)';
+        end
     end
 
     function go_prev(~,~)
@@ -402,6 +463,72 @@ if isvalid(fig), close(fig); end
         render_window(fig.UserData.cur);
     end
 
+    % ---- Interactive: choose which channels to hide (display only) ----
+    function choose_view_channels(~,~)
+        % One checkbox per channel (ticked = hidden) so each channel toggles
+        % independently — no Ctrl/Shift-click needed, unlike a listbox. Laid
+        % out in columns so all channels are visible without scrolling.
+        colW = 92; rowH = 22; padTop = 42; padBot = 52; padSide = 12;
+        nCols = max(1, ceil(nChans / 30));
+        nRows = ceil(nChans / nCols);
+        W = nCols * colW + 2 * padSide;
+        H = nRows * rowH + padTop + padBot;
+
+        dlg = figure('Name', 'Hide channels', 'NumberTitle', 'off', ...
+            'MenuBar', 'none', 'ToolBar', 'none', 'WindowStyle', 'modal', ...
+            'Units', 'pixels', 'Position', [0 0 W H], ...
+            'CloseRequestFcn', @(s,~) uiresume(s));
+        movegui(dlg, 'center');
+
+        uicontrol(dlg, 'Style', 'text', ...
+            'String', 'Tick channels to hide (display only):', ...
+            'Units', 'pixels', 'Position', [padSide H-padTop+8 W-2*padSide 22], ...
+            'HorizontalAlignment', 'left', 'FontSize', 9, 'FontWeight', 'bold');
+
+        cb = gobjects(1, nChans);
+        for i = 1:nChans
+            c = ceil(i / nRows);          % column 1..nCols
+            r = i - (c - 1) * nRows;      % row within column 1..nRows
+            x = padSide + (c - 1) * colW;
+            y = H - padTop - r * rowH;
+            cb(i) = uicontrol(dlg, 'Style', 'checkbox', 'String', labels{i}, ...
+                'Units', 'pixels', 'Position', [x y colW-4 rowH-2], ...
+                'Value', ~chan_visible(i), 'FontSize', 8);
+        end
+
+        bw = (W - 2*padSide - 2*8) / 3;
+        uicontrol(dlg, 'Style', 'pushbutton', 'String', 'Show all', ...
+            'Units', 'pixels', 'Position', [padSide 12 bw 30], ...
+            'Callback', @(~,~) set(cb, 'Value', 0));
+        uicontrol(dlg, 'Style', 'pushbutton', 'String', 'OK', ...
+            'Units', 'pixels', 'Position', [padSide+bw+8 12 bw 30], ...
+            'FontWeight', 'bold', 'Callback', @(~,~) view_ch_ok(dlg));
+        uicontrol(dlg, 'Style', 'pushbutton', 'String', 'Cancel', ...
+            'Units', 'pixels', 'Position', [padSide+2*(bw+8) 12 bw 30], ...
+            'Callback', @(~,~) uiresume(dlg));
+
+        setappdata(dlg, 'accepted', false);
+        uiwait(dlg);
+        if ~isvalid(dlg), return; end   % figure was destroyed
+
+        accepted = getappdata(dlg, 'accepted');
+        hide_now = arrayfun(@(h) logical(h.Value), cb);
+        delete(dlg);
+        if ~accepted, return; end
+
+        if all(hide_now)
+            warndlg('At least one channel must stay visible.', 'Hide channels');
+            return;
+        end
+        chan_visible = ~hide_now;
+        render_window(fig.UserData.cur);
+    end
+
+    function view_ch_ok(dlg)
+        setappdata(dlg, 'accepted', true);
+        uiresume(dlg);
+    end
+
     % ---- Line click: highlight nearest channel and show label ----
     function on_click(~,~)
         % Accept clicks on the axes background OR on any line inside it
@@ -412,9 +539,11 @@ if isvalid(fig), close(fig); end
         cp = ax.CurrentPoint;
         click_y = cp(1,2);
 
-        % Find channel whose baseline is closest to the click y-position
-        baselines = (nChans-1:-1:0) * chan_scale;   % ch=1 at top → offset=(nChans-1)*chan_scale
-        [~, ch] = min(abs(baselines - click_y));
+        % Find the visible channel whose baseline is closest to the click
+        if isempty(cur_visible), return; end
+        baselines = cur_offset(cur_visible);
+        [~, p]    = min(abs(baselines - click_y));
+        ch        = cur_visible(p);
 
         % Remove previous highlight and tooltip
         if ~isempty(h_highlight) && isvalid(h_highlight)
@@ -435,7 +564,7 @@ if isvalid(fig), close(fig); end
         end
         if isempty(target), return; end
 
-        offset = (nChans - ch) * chan_scale;
+        offset = cur_offset(ch);
         % White halo behind, then colored line on top
         plot(ax, target.XData, target.YData, 'w', 'LineWidth', 3.5, ...
             'HandleVisibility', 'off', 'PickableParts', 'none');
@@ -457,8 +586,9 @@ if isvalid(fig), close(fig); end
     function T = build_output()
         SampStart       = [win_data.SampStart]';
         SampEnd         = [win_data.SampEnd]';
-        TimeStart       = [win_data.TimeStart]';
-        TimeEnd         = [win_data.TimeEnd]';
+        % TimeStart/TimeEnd are recalculated from RemoveSampStart/RemoveSampEnd below
+        TimeStart       = nan(nWins, 1);
+        TimeEnd         = nan(nWins, 1);
         Decision        = {decisions.Decision}';
         RemoveChannels  = {decisions.RemoveChannels}';
         RemoveSampStart = cell(nWins, 1);
@@ -476,6 +606,8 @@ if isvalid(fig), close(fig); end
             if strcmp(decisions(w).Decision, 'keep')
                 RemoveSampStart{w} = [];
                 RemoveSampEnd{w}   = [];
+                TimeStart(w)       = NaN;
+                TimeEnd(w)         = NaN;
                 DataBefore{w}      = [];
                 DataArtifact{w}    = [];
                 DataAfter{w}       = [];
@@ -487,6 +619,9 @@ if isvalid(fig), close(fig); end
                 rs2 = decisions(w).RemoveSampEnd;
                 RemoveSampStart{w} = rs1;
                 RemoveSampEnd{w}   = rs2;
+                % Recalculate TimeStart/TimeEnd from actual removal samples
+                TimeStart(w)       = (rs1 - 1) / fs;
+                TimeEnd(w)         =  rs2       / fs;
 
                 chan_idx = find(ismember(labels, decisions(w).RemoveChannels));
 

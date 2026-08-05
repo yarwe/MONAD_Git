@@ -1,4 +1,4 @@
-function [chosen_chans, lab_chans] = choose_chans(EEG,what_do_w_chans)
+function [chosen_chans, lab_chans] = choose_chans(env,what_do_w_chans,nEEG)
 % Helps the user choose which channels to be **Something**, output is the
 % relevant channel numbers.
 fprintf(2, ['Provide Vector of channel numbers or cell of Channel labels to be %s.' ...
@@ -6,7 +6,7 @@ fprintf(2, ['Provide Vector of channel numbers or cell of Channel labels to be %
 chosen_chans=input('');
 
 if isempty(chosen_chans) && strcmpi(what_do_w_chans(1:4),'plot')
-        nchans = length(EEG.label);
+        nchans = nEEG;
         chosen_chans = randperm(nchans, 2);
 elseif isempty(chosen_chans) && strcmpi(what_do_w_chans(1:3),'rej')
     chosen_chans = [];
@@ -14,7 +14,7 @@ end
 
 printedLabelList = false;
 while ~isnumeric(chosen_chans)
-    [tf, idx] = ismember(lower(chosen_chans), lower(EEG.label));
+    [tf, idx] = ismember(lower(chosen_chans), lower(env.lay.label(1:nEEG)));
     missingLabels = chosen_chans(~tf);
     if isempty(missingLabels)
         chosen_chans = idx;   % convert labels to numeric channel indices
@@ -25,7 +25,7 @@ while ~isnumeric(chosen_chans)
         strjoin(missingLabels, ', '));
     if ~printedLabelList
         fprintf(2, '\nAvailable EEG labels are:\n');
-        fprintf(2, '%s\n', EEG.label{:});
+        fprintf(2, '%s\n', env.lay.label{:});
         printedLabelList = true;
     end
 
@@ -34,7 +34,7 @@ while ~isnumeric(chosen_chans)
     chosen_chans = input('');
 
     if isempty(chosen_chans) && strcmpi(what_do_w_chans(1:4),'plot')
-        nchans = length(EEG.label);
+        nchans = nEEG;
         chosen_chans = 1:nchans;
     elseif isempty(chosen_chans) && strcmpi(what_do_w_chans(1:3),'rej')
         chosen_chans = [];
@@ -43,6 +43,6 @@ while ~isnumeric(chosen_chans)
     end
 end
 % Return the corresponding channel label(s) for the chosen channels
-lab_chans = EEG.label(chosen_chans);
+lab_chans = env.lay.label(chosen_chans);
 
 end

@@ -95,14 +95,12 @@ post_right={'CP4', 'P4', 'P8','TP8', 'PO8', 'O2'};
 % Ventral / Occipital-Temporal ROI (For High-Alpha: 11–12 Hz)
 % Central ROI (For Control / Topography Checks)
 
-%% Choose noise channel for LAVI
-noise_chan = 'Cz';
-
+%% Choose noise channel
 %% find LAVI peaks
 % For all channels
 cfg = [];
 cfg.use_noise_limits = true;
-cfg.noise_channel = noise_chan;
+cfg.noise_channel = 'Cz';
 cfg.freq_range = [8 13];
 [borders_all_subj, sigVect_all_subj] = findLAVIBorders(cfg, LAVI_arr, foi);
 
@@ -110,7 +108,7 @@ cfg.freq_range = [8 13];
 cfg = [];
 cfg.channels = chosen_ch;
 cfg.use_noise_limits = true;
-cfg.noise_channel = noise_chan;
+cfg.noise_channel = 'Cz';
 cfg.freq_range = [8 13];
 cfg.average_channels = true;
 [borders_central_subj, sigVect_central_subj] = findLAVIBorders(cfg, LAVI_arr, foi);
@@ -119,7 +117,7 @@ cfg.average_channels = true;
 cfg = [];
 cfg.channels = post_left;
 cfg.use_noise_limits = true;
-cfg.noise_channel = noise_chan;
+cfg.noise_channel = 'Cz';
 cfg.freq_range = [8 13];
 cfg.average_channels = true;
 [borders_lp_subj, sigVect_lp_subj] = findLAVIBorders(cfg, LAVI_arr, foi);
@@ -133,7 +131,7 @@ cfg.average_channels = true;
 % pcfg.noise_var          : whether to plot the pink noise simulations (LAVI only)
 % pcfg.noiseCh            : which channel's pink noise to show
 pcfg = [];
-pcfg.dependant_variable = 'fft';   % 'LAVI' or 'fft'
+pcfg.dependant_variable = 'LAVI';   % 'LAVI' or 'fft'
 pcfg.plot_groups = {'ASD','NT'};
 pcfg.chosen_ch   =chosen_ch; % chosen_ch
 pcfg.noise_var   = true;            % set false to hide the pink noise (LAVI only)
@@ -147,6 +145,7 @@ close all;
 
 %% FFT real time 
 [durTbl, summary] = fftRecordingTime(FFT_arr, 5);
+
 % Check for outliers
 outliers = plotFFTOutliers(durTbl, groups, 'outlier_methods', {'zscore', 'iqr', 'mad'});
 

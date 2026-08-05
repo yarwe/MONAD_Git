@@ -76,7 +76,7 @@ else
             for fi = 1:N.freq
                 f = foi(fi);                
                 spectrum = waveletLight(pinkNoise, fs, f, width);
-                surrLAVI(ri,fi) = compute_lavi(spectrum,fs,f,lag);
+                surrLAVI(ri,fi) = HF_compute_lavi(spectrum,fs,f,lag);
             end
         end
         PINK(:,:,ch) = surrLAVI;
