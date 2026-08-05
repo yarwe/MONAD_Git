@@ -1,119 +1,136 @@
-function [env] = setupEnviroment11(exp)
-% 'OSF_simple', 'TalKennet', 'NMSG' (Neural Markers of Shared Gaze...)
-% 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
+function [env] = setupEnviroment11()
+%SETUPENVIROMENT11  Build the MONAD analysis environment struct.
+%
+%   env = setupEnviroment11()
+%
+%   Every setting that has to be configured by hand - toolbox locations, the
+%   repository location, and which experiment/paradigm to analyse - is read
+%   from config_local.m in the repository root. That file is git-ignored, so
+%   each machine keeps its own copy; see config_template.m for the fields and
+%   how to create one.
+%
+%   All data lives under a single git-ignored folder, <repo root>/Data. The
+%   config file holds no data paths at all - they are all derived from it.
+%   Every experiment uses the same layout:
+%
+%     Data/<exp>/                        experiment-level files, shared by all
+%                                        paradigms (e.g. TK_customLay.mat)
+%     Data/<exp>/<paradigm>/             LAVI/FFT arrays for this run
+%     Data/<exp>/<paradigm>/<data_type>  raw, clean, art, ICApng, ica_comp,
+%                                        prev_dat
+%
+%   Experiment names:
+%     'OSF_simple', 'TalKennet', 'NMSG', 'SFARI_EEG_multi'
+%     'NMSG'  (Neural Markers of Shared Gaze...)
+%     'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
+
+cfg = load_local_config();
+
 % List of possible experiment names
-experiments = {'OSF_simple', 'TalKennet', 'NMSG', 'IAASA','SFARI_EEG_multi'};
-paradigms_tal = {'tactile' ,  'aud' , 'rest'};
-paradigms_SFARI={'ASSR_run' ,  'FAST_run' , 'Beepflash_run' , 'AVSRT_run' , 'Motor_run' , 'IC_run' , 'rest'};
-% Check if the provided experiment name exists in the list
+experiments     = {'OSF_simple', 'TalKennet', 'NMSG', 'IAASA', 'SFARI_EEG_multi'};
+paradigms_tal   = {'tactile' ,  'aud' , 'rest'};
+paradigms_SFARI = {'ASSR_run' ,  'FAST_run' , 'Beepflash_run' , 'AVSRT_run' , 'Motor_run' , 'IC_run' , 'rest'};
+
+exp      = cfg.exp;
+paradigm = cfg.paradigm;
+
+% Check if the configured experiment name exists in the list
 if ~ismember(exp, experiments)
-    error('Experiment name does not exist');  % Break and display error message
+    error('Experiment name ''%s'' does not exist. Set cfg.exp in config_local.m to one of: %s', ...
+        exp, strjoin(experiments, ', '));
 end
 
-if strcmpi(exp,'TalKennet')
-    paradigm=input('Enter paradigm name (tactile /  aud / rest): ', 's');
-    if ~ismember(paradigm, paradigms_tal)
-        error('Paradigm name does not exist');  % Break and display error message
-    end
-elseif strcmpi(exp,'SFARI_EEG_multi')
-    paradigm=input('Enter paradigm name (ASSR_run /  FAST_run / Beepflash_run / AVSRT_run / Motor_run / IC_run / rest): ', 's');
-    if ~ismember(paradigm, paradigms_SFARI)
-        error('Paradigm name does not exist');  % Break and display error message
-    end
+% Every experiment's data is split by paradigm, so a paradigm is always needed
+if isempty(paradigm)
+    error(['Paradigm is empty. Set cfg.paradigm in config_local.m - it names ' ...
+           'the Data/%s/<paradigm>/ folder this run reads from.'], exp);
 end
 
-% setup paths according to user.
-[user, dat_ay_letter] = user_func();
+% Experiments with a known set of paradigms are checked against it
+if strcmpi(exp, 'TalKennet') && ~ismember(paradigm, paradigms_tal)
+    error('Paradigm ''%s'' does not exist for %s. Set cfg.paradigm in config_local.m to one of: %s', ...
+        paradigm, exp, strjoin(paradigms_tal, ', '));
+elseif strcmpi(exp, 'SFARI_EEG_multi') && ~ismember(paradigm, paradigms_SFARI)
+    error('Paradigm ''%s'' does not exist for %s. Set cfg.paradigm in config_local.m to one of: %s', ...
+        paradigm, exp, strjoin(paradigms_SFARI, ', '));
+end
 
-if strcmp(user, 'yoel')
-    git_path    = 'C:\Users\yoelgo\Documents\GitHub\MONAD_Git\';
-    matlab_path = 'C:\Program Files\MATLAB\';
-    ft_path     = [matlab_path 'fieldtrip-20250114\fieldtrip-20250114\'];
-    eeglab_path = [matlab_path 'eeglab_current\eeglab2025.0.0\'];
-    maindir     = [dat_ay_letter ':\Yarden\'];
-    
-else
-    git_path    = 'C:\Users\yarde\Documents\GitHub\MONAD_Git\'; % additinal_functions path in MONAD_Git
-    matlab_path = 'C:\Users\yarde\Documents\MATLAB\';
-    ft_path     = [matlab_path 'fieldtrip-20210614\'];
-    eeglab_path = [matlab_path 'biosig4octmat-3.8.4\biosig\eeglab\'];
-    maindir     = 'C:\Users\yarde\Documents\GitHub\MONAD_Git\'; % [dat_ay_letter ':\Yarden\'];
-    % Yarden additions to her PC due to issues with biosig
+%% setup toolbox paths according to the machine config
+git_path    = dirpath(cfg.git_path);
+matlab_path = dirpath(cfg.matlab_path);
+ft_path     = dirpath(cfg.ft_path);
+eeglab_path = dirpath(cfg.eeglab_path);
+maindir     = git_path;   % the repository root - everything is relative to it
+
+extra_func_path = dirpath(git_path, 'additional_functions');
+addpath(extra_func_path);
+% Add path to zapline clean plus
+addpath(dirpath(cfg.zapline_path));
+
+% On machines that need BioSig reinstalled at start-up (cfg.biosig_path set)
+biosig_path = optional_field(cfg, 'biosig_path', '');
+if ~isempty(biosig_path)
     original_dir = pwd;
-    cd('C:\Users\yarde\Documents\MATLAB\biosig4octmat-3.8.4');
+    cd(biosig_path);
     biosig_installer;
     cd(original_dir);
 end
-env.paths.csv_log    = [maindir 'csv_log\'];
-extra_func_path = [git_path 'additional_functions\'];
-addpath(extra_func_path);
-% Add path to zapline clean plus
-addpath([ matlab_path 'zapline-plus-main\'])
 
-preprocDir           = [maindir 'analysis_MONAD\MONAD_preproc'];
 env.exp              = exp;
+env.paradigm         = paradigm;
+env.user             = cfg.user;
+env.paths.git        = git_path;
+env.paths.matlab     = matlab_path;
 env.paths.extra_func = extra_func_path;
 env.paths.eeglab     = eeglab_path;
-env.dat_ay           = dat_ay_letter;
+env.paths.ft_path    = ft_path;
+env.paths.maindir    = maindir;
+env.paths.csv_log    = dirpath(maindir, 'csv_log');
+% The LAVI toolbox is source code tracked in git, not data
+env.paths.LAVI       = dirpath(git_path, 'analysis_MONAD', 'LAVI');
 
 % Initialize eeglab
 addpath(genpath(env.paths.eeglab));
-eeglab; close all;
+%eeglab; close all;
+
 % Initialize fieldtrip
 addpath(ft_path);
 ft_defaults();
 
-% Check if the folder for this exp exists, if not, create it and the subfolders
-exp_folder = [preprocDir '\' exp '\'];
-if ~exist(exp_folder, 'dir')
-    % Create the main folder for the experiment
-    mkdir(exp_folder);
-    % % Create subfolders
-    % env.paths.auto      = [exp_folder 'automated\'];
-    % env.paths.manual    = [exp_folder 'manual\'];
-    env.paths.art       = [exp_folder 'artifacts\'];
-    env.paths.clean     = [exp_folder 'clean\'];
-    env.paths.ICApng    = [exp_folder 'ICApng\'];
-    env.paths.ica_comp = [exp_folder 'ica_comp\'];
-    env.paths.prev_dat =['D:\MONAD ASD project\' exp '\prev_dat\']; 
-    % % Create the directories
-    % mkdir(env.paths.auto);
-    % mkdir(env.paths.manual);
-    mkdir(env.paths.art);
-    mkdir(env.paths.clean);
-    mkdir(env.paths.ICApng);
-    mkdir(env.paths.ica_comp)
-    mkdir(env.paths.prev_dat)
-end
-env.paths.maindir = maindir;
+%% data locations - every data file lives under maindir/Data
+env.paths.data = dirpath(maindir, 'Data');
+% Experiment-level folder, for files shared by all paradigms (custom layouts)
+env.paths.exp  = dirpath(env.paths.data, exp);
+% Working folder for this run. Holds the data_type subfolders below and the
+% LAVI/FFT arrays written by create_datArr21.
+work_dir = dirpath(env.paths.exp, paradigm);
+
+env.paths.preproc  = work_dir;
+env.paths.raw      = dirpath(work_dir, 'raw');
+env.paths.clean    = dirpath(work_dir, 'clean');
+env.paths.art      = dirpath(work_dir, 'art');
+env.paths.ICApng   = dirpath(work_dir, 'ICApng');
+env.paths.ica_comp = dirpath(work_dir, 'ica_comp');
+env.paths.prev_dat = dirpath(work_dir, 'prev_dat');
+
 %c = uisetcolor
 env.plots.lineASD = [0.4000    0.6667    0.8000];
 env.plots.lineNT  = [0.6118    0.8118    0.5843];
 env.plots.lineSCZ =  [0.9000    0.6667    0.9];
 
-% Existing code for handling specific experiments
+% Per-experiment layout, electrodes and data properties. All folder paths are
+% the same for every experiment now, so only the differences live below.
 if strcmp('OSF_simple', exp)
-    env.paths.raw       = [maindir 'OSF data\Simple\'];
-    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    % env.paths.auto      = [env.paths.preproc 'automated\'];
-    % env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'art\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
-    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
-    env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
-    env.paths.prev_dat = ['D:\MONAD ASD project\' exp '\prev_dat\'];
-    env.paths.ft_path = ft_path;
-    cfg = [];
-    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
-    env.lay = ft_prepare_layout(cfg);
+    cfg_lay = [];
+    cfg_lay.layout = fullfile(ft_path, 'template', 'layout', 'biosemi64.lay');
+    env.lay = ft_prepare_layout(cfg_lay);
     env.lay.height = env.lay.height(1:64);
     env.lay.label  = env.lay.label(1:64);
     env.lay.pos    = env.lay.pos(1:64,:);
     env.lay.width  = env.lay.width(1:64);
 
     env.data.type        = 'bdf';
-    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};    
+    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};
     env.data.ID          = cellfun(@(x) regexprep(x, '_.*', ''), env.data.names, 'UniformOutput', false);
     env.data.files       = fullfile(env.paths.raw, env.data.names);
     env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
@@ -130,35 +147,22 @@ if strcmp('OSF_simple', exp)
     env.data.group_table = table(IDs, replace(extractBefore(IDs, 2), {'A', 'C'}, ...
         {'ASD', 'NT'}), 'VariableNames', {'ID', 'group'});
 
-    
-    env.elec          = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
-    
+    env.elec          = ft_read_sens(fullfile(ft_path, 'template', 'electrode', 'standard_1020.elc'));
+
 elseif strcmp('TalKennet', exp)
-    env.paths.exp       = [maindir 'NIMH data\'];
-    env.paths.raw       = [maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\eeg_sub_files01\' paradigm];
-    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    % env.paths.auto      = [env.paths.preproc 'automated\'];
-    % env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'art\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
-    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
-    env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
-    env.paths.prev_dat =['D:\MONAD ASD project\' exp '\prev_dat\'];
-    env.paths.ft_path = ft_path;
-    
-    env.lay  =load('D:\MONAD ASD project\TalKennet\NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\TK_customLay.mat'); % load([maindir 'NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers\TK_customLay.mat']);
+    % Custom layout, shared by all paradigms of this experiment
+    env.lay  = load(fullfile(env.paths.exp, 'TK_customLay.mat'));
     env.lay  = env.lay.layout;
     % Fix Iz- written as IZ and later not recognized as EEG channel
     IZ_ind=find(strcmp(env.lay.label,'IZ'));
     if ~isempty(IZ_ind)
         env.lay.label(IZ_ind)={'Iz'};
     end
-    
-    env.elec = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
+
+    env.elec = ft_read_sens(fullfile(ft_path, 'template', 'electrode', 'standard_1020.elc'));
 
     env.data.type        = 'fif';
-    env.data.names       = {dir(fullfile(env.paths.raw, '*.fif')).name};    
+    env.data.names       = {dir(fullfile(env.paths.raw, '*.fif')).name};
     env.data.ID          = cellfun(@(x) regexprep(x, '_.*', ''), env.data.names, 'UniformOutput', false);
     env.data.files       = fullfile(env.paths.raw, env.data.names);
     env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
@@ -174,29 +178,16 @@ elseif strcmp('TalKennet', exp)
         {'ASD', 'NT'}), 'VariableNames', {'ID', 'group'});
 
 elseif strcmp('SFARI_EEG_multi', exp)
-    % External drive due to the heavy data
-    env.paths.exp       = 'D:\MONAD ASD project\SFARI_EEG multi-paradigm dataset (BIDS) OpenNeuro\';
-    % (!!) At the moment- only ASSR data
-    env.paths.raw       = [env.paths.exp 'raw_ASSR\'];
-    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    env.paths.art       = [env.paths.preproc 'art\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
-    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
-    env.paths.ica_comp = [env.paths.preproc 'ica_comp\'];
-    env.paths.prev_dat = [env.paths.preproc 'prev_dat\'];
-    env.paths.ft_path = ft_path;
-
-    cfg = [];
-    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
-    env.lay = ft_prepare_layout(cfg);
+    cfg_lay = [];
+    cfg_lay.layout = fullfile(ft_path, 'template', 'layout', 'biosemi64.lay');
+    env.lay = ft_prepare_layout(cfg_lay);
     env.lay.height = env.lay.height(1:64);
     env.lay.label  = env.lay.label(1:64);
     env.lay.pos    = env.lay.pos(1:64,:);
     env.lay.width  = env.lay.width(1:64);
 
     env.data.type        = 'bdf';
-    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};    
+    env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};
     env.data.ID = cellfun(@(x) regexprep(x, '^sub-(.*?)_.*$', '$1'), env.data.names, 'UniformOutput', false);
     env.data.files       = fullfile(env.paths.raw, env.data.names);
     env.data.clean_names = {dir(fullfile(env.paths.clean, '*.mat')).name};
@@ -213,19 +204,8 @@ elseif strcmp('SFARI_EEG_multi', exp)
         {'ASD', 'NT'}), 'VariableNames', {'ID', 'group'});
 
 elseif strcmp('NMSG', exp)
-    env.paths.exp       = [maindir 'NIMH data\'];
-    env.paths.raw       = [maindir 'NIMH data\NMSG\eeg_sub_files01'];
-    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    env.paths.auto      = [env.paths.preproc 'automated\'];
-    env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'artifacts\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
-    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
-    env.paths.ft_path = ft_path;
-    
-    env.lay  = load([env.paths.ft_path 'template\layout\GSN-HydroCel-128.mat']);
-    env.elec = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
+    env.lay  = load(fullfile(ft_path, 'template', 'layout', 'GSN-HydroCel-128.mat'));
+    env.elec = ft_read_sens(fullfile(ft_path, 'template', 'electrode', 'standard_1020.elc'));
 
     env.data.type        = 'mat';
     env.data.names       = {dir(fullfile(env.paths.raw, '*.mat')).name};
@@ -241,26 +221,14 @@ elseif strcmp('NMSG', exp)
 
 
 elseif strcmp('IAASA', exp)
-    env.paths.exp       = [maindir 'NIMH data\'];
-    env.paths.raw       = [maindir 'NIMH data\Package_1235552_Influence_of_Attention_and_Aroudal_on_Sensory_Abnormailities_in_ASD\eeg_sub_files01'];
-    env.paths.preproc   = exp_folder;  % Use the dynamically created folder
-    env.paths.auto      = [env.paths.preproc 'automated\'];
-    env.paths.manual    = [env.paths.preproc 'manual\'];
-    env.paths.art       = [env.paths.preproc 'artifacts\'];
-    env.paths.clean     = [env.paths.preproc 'clean\'];
-    env.paths.ICApng    = [env.paths.preproc 'ICApng\'];
-    env.paths.LAVI      = [maindir 'analysis_MONAD\LAVI\'];
-    env.paths.ft_path = ft_path;
-    
-        
-    cfg = [];
-    cfg.layout = fullfile([ft_path '\template\layout\biosemi64.lay']);
-    env.lay = ft_prepare_layout(cfg);
+    cfg_lay = [];
+    cfg_lay.layout = fullfile(ft_path, 'template', 'layout', 'biosemi64.lay');
+    env.lay = ft_prepare_layout(cfg_lay);
     env.lay.height = env.lay.height(1:64);
     env.lay.label  = env.lay.label(1:64);
     env.lay.pos    = env.lay.pos(1:64,:);
     env.lay.width  = env.lay.width(1:64);
-    env.elec = ft_read_sens([env.paths.ft_path '\template\electrode\standard_1020.elc']);
+    env.elec = ft_read_sens(fullfile(ft_path, 'template', 'electrode', 'standard_1020.elc'));
 
     env.data.type        = 'bdf';
     env.data.names       = {dir(fullfile(env.paths.raw, '*.bdf')).name};
@@ -280,7 +248,7 @@ elseif strcmp('IAASA', exp)
 end
 
 % Check all paths: warn if missing for read-only paths, create if missing for output paths
-error_paths = {'extra_func', 'eeglab', 'maindir', 'LAVI', 'ft_path', 'raw'};
+error_paths = {'git', 'matlab', 'extra_func', 'eeglab', 'maindir', 'LAVI', 'ft_path', 'data', 'raw'};
 path_fields = fieldnames(env.paths);
 for i = 1:numel(path_fields)
     field = path_fields{i};
@@ -293,4 +261,61 @@ for i = 1:numel(path_fields)
             fprintf('Created folder: %s\n', p);
         end
     end
+end
+
+end
+
+% ------------------------------------------------------------------------
+function cfg = load_local_config()
+%LOAD_LOCAL_CONFIG  Read config_local.m from the repository root.
+
+repo_root = fileparts(mfilename('fullpath'));
+cfg_file  = fullfile(repo_root, 'config_local.m');
+
+if ~exist(cfg_file, 'file')
+    error(['config_local.m was not found in %s\n' ...
+           'Every machine needs its own copy: copy config_template.m to ' ...
+           'config_local.m, rename the function inside it to config_local, ' ...
+           'and fill in the paths for this machine. config_local.m is ' ...
+           'git-ignored on purpose, so it is never committed.'], repo_root);
+end
+
+% Make sure the repository root is reachable, so config_local can be called
+% even when MATLAB is not currently in it
+addpath(repo_root);
+cfg = config_local();
+
+required = {'user', 'git_path', 'matlab_path', 'ft_path', 'eeglab_path', ...
+            'zapline_path', 'exp', 'paradigm'};
+missing  = required(~isfield(cfg, required));
+if ~isempty(missing)
+    error(['config_local.m is missing required field(s): %s\n' ...
+           'See config_template.m for the full list.'], strjoin(missing, ', '));
+end
+
+end
+
+% ------------------------------------------------------------------------
+function p = dirpath(varargin)
+%DIRPATH  fullfile() for a folder, with a guaranteed trailing separator.
+%   Downstream code concatenates these paths directly, e.g.
+%   [env.paths.preproc 'LAVI_arr.mat'], so the trailing separator matters.
+
+p = fullfile(varargin{:});
+if ~isempty(p) && ~any(p(end) == '/\')
+    p = [p filesep];
+end
+
+end
+
+% ------------------------------------------------------------------------
+function val = optional_field(cfg, name, default)
+%OPTIONAL_FIELD  Value of cfg.(name), or default when absent or empty.
+
+if isfield(cfg, name) && ~isempty(cfg.(name))
+    val = cfg.(name);
+else
+    val = default;
+end
+
 end

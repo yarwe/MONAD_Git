@@ -2,20 +2,15 @@
 %% Clear
 clear all; clc; close all;
 
-%% Set main folder
-% cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
-main_monad_git_folder = input('What is the path of MONAD_Git folder? ', 's');
-if isempty(main_monad_git_folder)
-    main_monad_git_folder=pwd;
-end
-cd(main_monad_git_folder)
-
 %% load enviroment according to the experiment
-% Experiment names: 'OSF_simple', 'TalKennet',
+% The experiment (and the MONAD_Git folder) are set in config_local.m,
+% see config_template.m. Experiment names: 'OSF_simple', 'TalKennet',
+% 'NMSG', 'SFARI_EEG_multi',
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 
-env = setupEnviroment11(input('Enter experiment name (OSF_simple /  TalKennet / SFARI_EEG_multi): ', 's'));
-addpath(env.paths.extra_func); addpath([env.paths.ft_path 'external\eeglab\']);
+env = setupEnviroment11();
+cd(env.paths.git)
+addpath(env.paths.extra_func); addpath(fullfile(env.paths.ft_path, 'external', 'eeglab'));
 clc;
 
 

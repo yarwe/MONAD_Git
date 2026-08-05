@@ -1,6 +1,15 @@
 Project Overview
 This repository contains the EEG preprocessing and frequency analysis pipeline. Below is a guide to the codebase structure and how to run it.
 
+Setup (once per machine)
+Everything that has to be configured by hand — toolbox locations, data roots, and which experiment/paradigm to analyse — lives in a single file, config_local.m, in the repository root:
+
+1. Copy config_template.m to config_local.m
+2. Rename the function on its first line from config_template to config_local
+3. Fill in the paths and the experiment for this machine
+
+config_local.m is git-ignored, so every machine keeps its own copy and it is never committed. setupEnvironment11() reads it and errors with a clear message if it is missing or incomplete. To switch experiment or paradigm, edit cfg.exp / cfg.paradigm there — the scripts no longer prompt for them.
+
 Code Organization
 Files and functions are numbered to indicate their stage and role:
 

@@ -1,2 +1,9 @@
 ﻿NIMH data/
 OSF data/
+
+# All data files (raw, clean, artifacts, ICA, LAVI/FFT arrays, ...)
+Data/
+
+# Per-machine configuration - each machine keeps its own copy,
+# created from config_template.m
+config_local.m

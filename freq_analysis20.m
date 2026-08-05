@@ -2,22 +2,15 @@
 clear all;
 clc; close all;
 
-%% Set main folder
-% cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
-main_monad_git_folder = input('What is the path of MONAD_Git folder? ', 's');
-if isempty(main_monad_git_folder)
-    main_monad_git_folder=pwd;
-end
-cd(main_monad_git_folder)
-
-
 %% load enviroment and folder paths according to the experiment
-% Experiment names: 'OSF_simple', 'TalKennet',
+% The experiment (and the MONAD_Git folder) are set in config_local.m,
+% see config_template.m. Experiment names: 'OSF_simple', 'TalKennet',
+% 'NMSG', 'SFARI_EEG_multi',
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 
-env = setupEnviroment11(input('Enter experiment name (OSF_simple /  TalKennet / SFARI_EEG_multi): ', 's'));
-addpath(env.paths.extra_func); addpath([env.paths.ft_path 'external\eeglab\']);
-clc;
+env = setupEnviroment11();
+cd(env.paths.git)
+addpath(env.paths.extra_func); addpath(fullfile(env.paths.ft_path, 'external', 'eeglab'));
 
 % clean previous data to not create confusions
 clear EEG pEEG_zclean pEEG_mcleanCh pEEG pEEG_mclean man_art2 man_art comp badCh Mart dat_after_ICA
@@ -27,6 +20,8 @@ clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST
 addpath(env.paths.LAVI);
 
 %% Set parameters for LAVI and FFT
+clc;
+
 foi = 1:0.5:90;
 
 % set LAVI parameters

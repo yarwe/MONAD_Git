@@ -8,22 +8,20 @@
 clear all; close all; clc;
 
 %% Setup paths and parameters
-main_monad_git_folder = input('What is the path of MONAD_Git folder? ', 's');
-cd(main_monad_git_folder);
-addpath("additional_functions");
-addpath("C:\Users\yarde\Documents\MATLAB\") % For functions look_eyeblinks_af_ICA
+% Load environment. All machine-specific paths and the experiment to
+% visualize come from config_local.m, see config_template.m
+env = setupEnviroment11();
+cd(env.paths.git);
+addpath(env.paths.extra_func);
+addpath(env.paths.matlab) % For functions look_eyeblinks_af_ICA
 
-% User inputs for which dataset and subject to visualize
-experiment = input('Enter experiment name (OSF_simple or TalKennet): ', 's');
+experiment = env.exp;
+
+% User input for which subject to visualize
 subject_id = input('Enter subject ID to visualize (e.g., 011201, A10): ', 's');
 
 % Define data paths
-clean_data_path = fullfile(pwd, 'analysis_MONAD', 'MONAD_preproc', experiment, 'new_clean\');
-
-%% Load
-% Load environment
-env = setupEnviroment11(experiment);
-addpath(env.paths.extra_func);
+clean_data_path = fullfile(env.paths.preproc, 'new_clean');
 
 % Load datasets
 find_subject_idx = @(subject_id, id_list) find(strcmp(id_list, subject_id), 1);
