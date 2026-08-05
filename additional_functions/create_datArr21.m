@@ -91,18 +91,27 @@ end
 N = length(env.data.clean_files);
 
 % EEG structure template
-strct = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {Lcfg.foi}, ...
+strctTemplate = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {Lcfg.foi}, ...
     'label', {env.lay.cfg.channel}, 'elec', {env.elec}, 'time', []); % for label- {env.lay.label(1:64)}
-counter = 0;
+
+% Broadcast only what the workers need, instead of the whole env struct
+clean_files = env.data.clean_files;
+nEEG        = env.nEEG;
+
+% Sliced outputs: one cell per participant. Skipped participants stay empty
+% and are dropped after the loop.
+LAVI_new = cell(1, N);
+FFT_new  = cell(1, N);
+
 % Iterate over participants
-for s = 1:N
-    file = env.data.clean_files{s};
+parfor s = 1:N
+    file = clean_files{s};
     ID = regexp(file, '([A-Za-z0-9]+)_clean.mat', 'tokens', 'once');
     if ismember(ID, prevIDs)
         continue;
     end
     disp(['participant number:' num2str(s)]);
-    
+
     % load file and extract the struct
     tmp = load(file);
     fieldName = fieldnames(tmp);
@@ -111,7 +120,8 @@ for s = 1:N
     catch
         EEG = tmp.(fieldName{1});
     end
-    
+    tmp = []; %#ok<NASGU> % released: nothing reads tmp past this point
+
     % % check if there are accidentaly EOG channels
     % sz = size(EEG.trial{1});
     % if sz(1) > 64
@@ -126,8 +136,9 @@ for s = 1:N
     noise        = {};
 
     % LAVI analysis %
-    strct.ID = ID{1};    
-    LAVI = zeros(env.nEEG, length(Lcfg.foi));
+    strct = strctTemplate;
+    strct.ID = ID{1};
+    LAVI = zeros(nEEG, length(Lcfg.foi));
     n_pink_rep=20;
     samp_rate=Lcfg.fs;
     % Calculate LAVI for each electrode
@@ -156,33 +167,34 @@ for s = 1:N
     strct.time      = [EEG.sampleinfo(1), EEG.sampleinfo(2)];
     strct.powspctrm = LAVI;
     strct.noise     = noiseStrct;
-    LAVI_arr{end+1} = strct;
+    LAVI_new{s}     = strct;
 
-    
-    % FFT analysis % (!) yarden changed window into 5s instead of 15: cfg.length = 15;
-    cfg = [];
-    cfg.length = 5;
-    EEGtrl = ft_redefinetrial(cfg,EEG);
-    cfg = [];
-    cfg.trials = find(~cellfun(@(x) any(isnan(x(:))), EEGtrl.trial));
+
+    % FFT analysis % (!) yarden changed window into 5s instead of 15: tcfg.length = 15;
+    tcfg = [];
+    tcfg.length = 5;
+    EEGtrl = ft_redefinetrial(tcfg,EEG);
+    EEG = []; %#ok<NASGU> % released: last use is the ft_redefinetrial call above
+    num_win = length(EEGtrl.trial); % counted here, before EEGtrl is released
+    tcfg = [];
+    tcfg.trials = find(~cellfun(@(x) any(isnan(x(:))), EEGtrl.trial));
     % Remove trials with NaNs
-    EEGtrl_clean = ft_selectdata(cfg, EEGtrl);
-    
-    fftstrct = [];
+    EEGtrl_clean = ft_selectdata(tcfg, EEGtrl);
+    EEGtrl = []; %#ok<NASGU> % released
+
     fftstrct = ft_freqanalysis(Fcfg, EEGtrl_clean);
-    fftstrct.num_win = length(EEGtrl.trial);
-    fftstrct.rem_win =  fftstrct.num_win - length(cfg.trials);
+    EEGtrl_clean = []; %#ok<NASGU> % released
+    fftstrct.num_win = num_win;
+    fftstrct.rem_win =  num_win - length(tcfg.trials);
     fftstrct.ID = ID{1};
     fftstrct.cfg.previous = [];
-    FFT_arr{end+1} = fftstrct;
-    
-    counter = counter + 1;
-
-    if mod(counter, 5) == 0
-        save([env.paths.preproc num2str(length(LAVI_arr)) '_LAVI_arr'], 'LAVI_arr', '-v7.3', '-nocompression');
-        save([env.paths.preproc num2str(length(FFT_arr)) '_FFT_arr'], 'FFT_arr', '-v7.3', '-nocompression');
-    end
+    FFT_new{s} = fftstrct;
 end
+
+% Append the newly processed participants, keeping the original order and
+% dropping the participants that were skipped
+LAVI_arr = [LAVI_arr(:).', LAVI_new(~cellfun(@isempty, LAVI_new))];
+FFT_arr  = [FFT_arr(:).',  FFT_new(~cellfun(@isempty, FFT_new))];
 
 
 % Save the data
