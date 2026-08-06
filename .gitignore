@@ -7,3 +7,6 @@ Data/
 # Per-machine configuration - each machine keeps its own copy,
 # created from config_template.m
 config_local.m
+
+# MATLAB editor autosave files
+*.asv
