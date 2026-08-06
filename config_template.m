@@ -68,4 +68,20 @@ cfg.exp            = 'OSF_simple';
 %                     'Motor_run', 'IC_run', 'rest'
 cfg.paradigm       = 'rest';
 
+%% Parallel pool ---------------------------------------------------------
+% OPTIONAL. Number of parfor workers for create_datArr21. Leave as [] to let
+% MATLAB pick its default pool size.
+%
+% This is bound by RAM, not by core count: every worker is a separate MATLAB
+% process holding its own full copy of the participant it is working on, and
+% the loop body briefly holds two copies at once. Estimate with
+%
+%   n_workers = floor( (RAM_total - RAM_reserved) / peak_RAM_per_worker )
+%
+% where peak_RAM_per_worker ~ 2x the largest clean .mat plus ~1 GB of MATLAB
+% baseline, and RAM_reserved covers the OS, the desktop and the client MATLAB
+% session. Over-subscribing does not raise a clean error - it exhausts RAM
+% and freezes the machine.
+cfg.n_workers      = [];
+
 end

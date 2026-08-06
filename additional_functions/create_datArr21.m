@@ -98,6 +98,21 @@ strctTemplate = struct('powspctrm', [], 'dimord', 'chan_freq', 'freq', {Lcfg.foi
 clean_files = env.data.clean_files;
 nEEG        = env.nEEG;
 
+% Size the parallel pool from cfg.n_workers in config_local.m. Each worker is
+% a separate process holding its own copy of the participant it loads, so this
+% is a memory budget, not a core count - see the note in config_template.m.
+pool = gcp('nocreate');
+if isempty(env.n_workers)
+    if isempty(pool), pool = parpool('local'); end
+else
+    if ~isempty(pool) && pool.NumWorkers ~= env.n_workers
+        delete(pool);
+        pool = [];
+    end
+    if isempty(pool), pool = parpool('local', env.n_workers); end
+end
+fprintf('Processing %d participants on %d workers.\n', N, pool.NumWorkers);
+
 % Sliced outputs: one cell per participant. Skipped participants stay empty
 % and are dropped after the loop.
 LAVI_new = cell(1, N);

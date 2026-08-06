@@ -20,25 +20,35 @@ function [env] = setupEnviroment11()
 %                                        prev_dat
 %
 %   Experiment names:
-%     'OSF_simple', 'TalKennet', 'NMSG', 'SFARI_EEG_multi'
+%     'OSF', 'TalKennet', 'NMSG', 'SFARI_EEG_multi'
 %     'NMSG'  (Neural Markers of Shared Gaze...)
 %     'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 
 cfg = load_local_config();
 
-% List of possible experiment names
-experiments     = {'OSF_simple', 'TalKennet', 'NMSG', 'IAASA', 'SFARI_EEG_multi'};
-paradigms_tal   = {'tactile' ,  'aud' , 'rest'};
-paradigms_SFARI = {'ASSR_run' ,  'FAST_run' , 'Beepflash_run' , 'AVSRT_run' , 'Motor_run' , 'IC_run' , 'rest'};
+% Possible experiments and, for each, its possible paradigms - mirroring the
+% Data/<exp>/<paradigm>/ folder structure. An empty paradigm list means the
+% paradigms for that experiment have not been filled in yet, so any folder
+% name is accepted; fill the list in to have it checked.
+experiments = {
+    'OSF'             , {'simple','complex'}
+    'TalKennet'       , {'tactile', 'aud', 'rest'}
+    'NMSG'            , {}
+    'IAASA'           , {}
+    'SFARI_EEG_multi' , {'ASSR_run', 'FAST_run', 'Beepflash_run', 'AVSRT_run', 'Motor_run', 'IC_run', 'rest'}
+    };
+exp_names = experiments(:, 1)';
 
 exp      = cfg.exp;
 paradigm = cfg.paradigm;
 
 % Check if the configured experiment name exists in the list
-if ~ismember(exp, experiments)
+exp_idx = find(strcmp(exp, exp_names), 1);
+if isempty(exp_idx)
     error('Experiment name ''%s'' does not exist. Set cfg.exp in config_local.m to one of: %s', ...
-        exp, strjoin(experiments, ', '));
+        exp, strjoin(exp_names, ', '));
 end
+paradigms = experiments{exp_idx, 2};
 
 % Every experiment's data is split by paradigm, so a paradigm is always needed
 if isempty(paradigm)
@@ -46,13 +56,10 @@ if isempty(paradigm)
            'the Data/%s/<paradigm>/ folder this run reads from.'], exp);
 end
 
-% Experiments with a known set of paradigms are checked against it
-if strcmpi(exp, 'TalKennet') && ~ismember(paradigm, paradigms_tal)
+% Experiments whose paradigms are listed above are checked against that list
+if ~isempty(paradigms) && ~ismember(paradigm, paradigms)
     error('Paradigm ''%s'' does not exist for %s. Set cfg.paradigm in config_local.m to one of: %s', ...
-        paradigm, exp, strjoin(paradigms_tal, ', '));
-elseif strcmpi(exp, 'SFARI_EEG_multi') && ~ismember(paradigm, paradigms_SFARI)
-    error('Paradigm ''%s'' does not exist for %s. Set cfg.paradigm in config_local.m to one of: %s', ...
-        paradigm, exp, strjoin(paradigms_SFARI, ', '));
+        paradigm, exp, strjoin(paradigms, ', '));
 end
 
 %% setup toolbox paths according to the machine config
@@ -79,6 +86,8 @@ end
 env.exp              = exp;
 env.paradigm         = paradigm;
 env.user             = cfg.user;
+% Number of parfor workers. Empty means "let MATLAB choose its default".
+env.n_workers        = optional_field(cfg, 'n_workers', []);
 env.paths.git        = git_path;
 env.paths.matlab     = matlab_path;
 env.paths.extra_func = extra_func_path;
@@ -120,7 +129,7 @@ env.plots.lineSCZ =  [0.9000    0.6667    0.9];
 
 % Per-experiment layout, electrodes and data properties. All folder paths are
 % the same for every experiment now, so only the differences live below.
-if strcmp('OSF_simple', exp)
+if strcmp('OSF', exp)
     cfg_lay = [];
     cfg_lay.layout = fullfile(ft_path, 'template', 'layout', 'biosemi64.lay');
     env.lay = ft_prepare_layout(cfg_lay);
