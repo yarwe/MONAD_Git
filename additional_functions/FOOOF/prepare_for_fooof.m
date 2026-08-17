@@ -2,15 +2,20 @@
 %% Clear
 clear all; clc; close all;
 
+%% Set main folder
+% cd('C:\Users\yarde\Documents\GitHub\MONAD_Git\');
+main_monad_git_folder = input('What is the path of MONAD_Git folder? ', 's');
+if isempty(main_monad_git_folder)
+    main_monad_git_folder=pwd;
+end
+cd(main_monad_git_folder)
+
 %% load enviroment according to the experiment
-% The experiment (and the MONAD_Git folder) are set in config_local.m,
-% see config_template.m. Experiment names: 'OSF_simple', 'TalKennet',
-% 'NMSG', 'SFARI_EEG_multi',
+% Experiment names: 'OSF_simple', 'TalKennet',
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
 
 env = setupEnviroment11();
-cd(env.paths.git)
-addpath(env.paths.extra_func); addpath(fullfile(env.paths.ft_path, 'external', 'eeglab'));
+addpath(env.paths.extra_func); addpath([env.paths.ft_path 'external\eeglab\']);
 clc;
 
 
@@ -26,7 +31,7 @@ nsubjs=length(env.data.names);
 nEEG=env.nEEG;
 data_preproc = readtable([main_monad_git_folder '\csv_log\MONAD_log.csv']);
 %% Loop over subjects
-for subj=13:nsubjs
+for subj=6:nsubjs
     clearvars -except env subj nsubjs nEEG data_preproc main_monad_git_folder
     ID          = env.data.ID{subj};
     fprintf("Participant ID=%s \n",ID)
@@ -138,7 +143,7 @@ for subj=13:nsubjs
         dat_after_ICA1h_art2=dat_after_ICA1h;
     end
     %% Channel interpolation
-    if ~isempty(bad_chans)
+    if ~isempty(bad_chans{1})
         missingchan = bad_chans;          % channels dropped prior to ICA
         dat_after_ICA1h_art2.elec = env.elec; 
         % Build neighbours from the FULL montage (includes the bad channels),
@@ -160,10 +165,26 @@ for subj=13:nsubjs
         cfg.senstype       = 'EEG';
         cfg.badchannel = missingchan;
         data_repaired      = ft_channelrepair(cfg, dat_after_ICA1h_art2);
-        % Put channels back into the original montage order
-        [tf, loc] = ismember(pEEG_f_aft_art.label, data_repaired.label);
-        assert(all(tf), 'Some original channels are missing from data_repaired: %s', ...
-               strjoin(pEEG_f_aft_art.label(~tf), ', '));
+        % Put channels back into the original montage order.
+        % NOTE: ft_channelrepair only returns channels that are part of the EEG
+        % electrode montage (env.elec), so non-scalp channels such as EOG
+        % (e.g. eogH, eogV in the OSF data) are dropped here. That is expected
+        % and fine for FOOOF, so we only require the EEG-montage channels to
+        % survive; any tolerated non-montage channels are simply left out.
+        orig_order = pEEG_f_aft_art.label;
+        [tf, loc]  = ismember(orig_order, data_repaired.label);
+
+        % A channel may legitimately be absent only if it is NOT in the EEG
+        % montage (e.g. EOG). A missing channel that IS in the montage is a bug.
+        in_montage         = ismember(orig_order, env.elec.label);
+        missing_unexpected = orig_order(~tf & in_montage);
+        assert(isempty(missing_unexpected), ...
+            'Some EEG channels are missing from data_repaired: %s', ...
+            strjoin(missing_unexpected, ', '));
+
+        % Reorder to the original montage, keeping only channels that are
+        % present (drops EOG etc.), so downstream sees EEG in a consistent order.
+        loc = loc(tf);
         data_repaired.label = data_repaired.label(loc);
         for i = 1:numel(data_repaired.trial)
             data_repaired.trial{i} = data_repaired.trial{i}(loc, :);
@@ -171,14 +192,15 @@ for subj=13:nsubjs
     
         % view the data again to ensure channel fix
         open_databrow(data_repaired, 'nchan',30);
-        % show the difference in variance in these  channels
-        [~,rej_chans_num]=sort(ismember(bad_chans,EEG.label));
-        comp_var_bef_aft(pEEG_f_aft_art,data_repaired,rej_chans_num, {'Before interpolation','After interpolation'});
+        % show the difference in variance in the interpolated channels.
+        % Pass the channel NAMES so comp_var_bef_aft looks up the correct index
+        % in each dataset (their channel orders can differ, e.g. EOG dropped).
+        comp_var_bef_aft(pEEG_f_aft_art, data_repaired, bad_chans, {'Before interpolation','After interpolation'});
 
     else
         data_repaired=dat_after_ICA1h_art2;
         method_interpolate='';
     end
     %% Save data for fooof
-    save(['D:\MONAD ASD project\' env.exp '\FOOOF\' ID '_fooof'],"data_repaired")
+    save([env.paths.preproc '\FOOOF\' ID '_fooof'],"data_repaired", '-v7.3', '-nocompression')
 end

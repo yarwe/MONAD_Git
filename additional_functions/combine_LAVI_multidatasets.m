@@ -4,9 +4,7 @@ load('C:\Users\yarde\Documents\GitHub\MONAD_Git\analysis_MONAD\MONAD_preproc\Tal
 LAVI_arr_tk=LAVI_arr;
 clear LAVI_arr
 load('Z:\Yarden\analysis_MONAD\MONAD_preproc\OSF_simple\LAVI_arr.mat')
-% This script merges two datasets; env is only used here for the group plot
-% colours, so the experiment set in config_local.m does not matter
-[env] = setupEnviroment11();
+[env] = setupEnviroment11('TalKennet');
 %% Combine into one array
 combined_arr = [LAVI_arr, LAVI_arr_tk];
 

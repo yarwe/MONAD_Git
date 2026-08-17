@@ -60,11 +60,20 @@ cfg.peak_width_limits = [1 6];      % min/max bandwidth (Hz)
 cfg.max_n_peaks       = 6;
 cfg.min_peak_height   = 0.05;       % log10 power
 cfg.peak_threshold    = 1.5;        % in SD of the flattened spectrum
-cfg.alpha_band        = [7 14];     % window for picking the alpha peak (Hz)
+cfg.alpha_band        = [8 13];     % window for picking the alpha peak (Hz)
 
 fs      = 250;                      % <-- your sampling rate (Hz)
 win_sec = 2;  overlap = 0.5;        % Welch window / overlap (paper settings)
 
+%% Choose data folder
+if ~RUN_SELFTEST
+    env = setupEnviroment11();
+    cd(env.paths.git)
+    addpath(env.paths.extra_func); addpath(fullfile(env.paths.ft_path, 'external', 'eeglab'));
+    fs=env.data.fsample;
+end
+
+%% Run
 if RUN_SELFTEST
     %% -------------------- SELF-TEST: simulated data --------------------
     % Build two groups whose ground-truth alpha CF and aperiodic exponent
@@ -86,13 +95,14 @@ else
     % continuous trial with NaN artifact gaps). Adjust paths / ROI as needed.
 
     roi   = {'Oz','POz','Pz','O1','O2'};     % posterior ROI for alpha
+    name1 = 'NT'; name2 = 'ASD';
     files1 = { ... % <-- group 1 clean files
         % 'C:\...\clean\103301_clean.mat', ...
         };
     files2 = { ... % <-- group 2 clean files
         % 'C:\...\clean\030809_clean.mat', ...
         };
-    name1 = 'NT'; name2 = 'ASD';
+    
 
     [S1, f, lab1] = build_group_psd(files1, roi, fs, win_sec, overlap);
     [S2, ~, lab2] = build_group_psd(files2, roi, fs, win_sec, overlap);

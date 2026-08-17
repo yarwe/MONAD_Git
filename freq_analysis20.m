@@ -4,9 +4,10 @@ clc; close all;
 
 %% load enviroment and folder paths according to the experiment
 % The experiment (and the MONAD_Git folder) are set in config_local.m,
-% see config_template.m. Experiment names: 'OSF_simple', 'TalKennet',
+% see config_template.m. Experiment names: 'OSF', 'TalKennet',
 % 'NMSG', 'SFARI_EEG_multi',
 % 'IAASA' (Influence of Attention and Aroudal on Sensory Abnormailities...)
+% Pardigm- 'tactile','auditory', 'simple', 'rest' etc.
 
 env = setupEnviroment11();
 cd(env.paths.git)

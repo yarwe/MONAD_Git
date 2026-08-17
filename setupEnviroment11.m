@@ -116,6 +116,7 @@ work_dir = dirpath(env.paths.exp, paradigm);
 
 env.paths.preproc  = work_dir;
 env.paths.raw      = dirpath(work_dir, 'raw');
+env.paths.foof      = dirpath(work_dir, 'FOOOF');
 env.paths.clean    = dirpath(work_dir, 'clean');
 env.paths.art      = dirpath(work_dir, 'art');
 env.paths.ICApng   = dirpath(work_dir, 'ICApng');
