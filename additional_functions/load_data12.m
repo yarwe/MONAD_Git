@@ -2,7 +2,7 @@ function [ftEEG] = load_data(env, filename)
     % load data for each data-set
     clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST STUDY tmpEEG
     
-    if strcmp(env.exp, 'OSF_simple')
+    if strcmp(env.exp, 'OSF') %%% (!!!)  fix for more OSF datasets- for complex
         EEG = pop_biosig(filename);
         ftEEG = biosig2ft(EEG, 'OSF_simple');
         events = ftEEG.cfg.event;

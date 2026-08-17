@@ -1,8 +1,15 @@
 function groups = groupDataByExperiment(env, LAVI_arr, FFT_arr, exp_groups)
-% GROUPDATABYEXPERIMENT  Organize LAVI and FFT data into groups by experiment type
+% GROUPDATABYEXPERIMENT  Organize LAVI and FFT data into groups by experiment
 %
-% Handles both OSF_simple and TalKennet experiments, organizing data into
-% groups (ASD, NT, SCZ) for grand averaging and further analysis.
+% Organizes data into groups (ASD, NT, SCZ) for grand averaging and further
+% analysis. Which experiment/paradigm the data comes from is taken from the
+% environment struct: env.exp names the experiment ('OSF', 'TalKennet', ...)
+% and env.paradigm the follow-up paradigm inside it ('simple', 'tactile',
+% ...) - see setupEnviroment11 for the full list.
+%
+% How participants are assigned to groups depends on the experiment, not on
+% the paradigm: every paradigm of an experiment shares the same participants
+% and therefore the same group membership.
 %
 % INPUTS:
 %   env           : environment struct with paths and settings
@@ -39,28 +46,17 @@ for i = 1:numel(groups)
 end
 
 % Load experiment-specific grouping information
-switch lower(env.exp)
-    case 'osf_simple'
-        % OSF_simple: group membership in ID label
-        grouping_info = [];  % Not needed for OSF
-
-    case 'talkennet'
-        % TalKennet: load group membership from CSV
-        grouping_info = loadTalKenetGrouping();
-
-    otherwise
-        error('Unknown experiment: %s', env.exp);
-end
+grouping_info = loadGroupingInfo(env);
 
 % Extract LAVI IDs for matching both LAVI and FFT (match original behavior)
 LAVI_IDs = cellfun(@(s) s.ID, LAVI_arr, 'UniformOutput', false);
 LAVI_IDs_str = string(LAVI_IDs);
 
 % Assign LAVI data to groups
-groups = assignDataToGroups(groups, LAVI_arr, grouping_info, env.exp, 'LAVI', LAVI_IDs_str);
+groups = assignDataToGroups(groups, LAVI_arr, grouping_info, 'LAVI', LAVI_IDs_str);
 
 % Assign FFT data to groups (use LAVI IDs to match, like original code does)
-groups = assignDataToGroups(groups, FFT_arr, grouping_info, env.exp, 'FFT', LAVI_IDs_str);
+groups = assignDataToGroups(groups, FFT_arr, grouping_info, 'FFT', LAVI_IDs_str);
 
 % Compute grand averages for both LAVI and FFT
 groups = computeGrandAverages(groups);
@@ -71,18 +67,48 @@ end
 % HELPER FUNCTIONS
 % =========================================================================
 
-function grouping_info = loadTalKenetGrouping()
-% Load TalKenet group membership from CSV file
-talKenet_group_file = fullfile( ...
-    'D:\MONAD ASD project\TalKennet\NIMH data\Package_1235544-Tal Kenet MEG EEG biomarkers', ...
-    'Number_group_meg_eeg_biomarkers.csv' ...
-);
+function grouping_info = loadGroupingInfo(env)
+% Pick the grouping method for this experiment and load whatever it needs.
+%
+% grouping_info.method decides how getGroupIndices matches IDs:
+%   'id_label' - the group's single-letter code is part of the ID itself
+%   'table'    - membership comes from a lookup table (grouping_info.table)
 
-if ~isfile(talKenet_group_file)
-    error('TalKenet group file not found: %s', talKenet_group_file);
+switch lower(env.exp)
+    case 'osf'
+        % OSF: group membership is in the ID label ('A12' / 'C12')
+        grouping_info.method = 'id_label';
+
+    case 'talkennet'
+        % TalKennet: numeric IDs, group membership comes from a CSV
+        grouping_info = loadTalKenetGrouping(env);
+
+    otherwise
+        error(['Grouping is not defined for experiment ''%s'' (paradigm ' ...
+               '''%s''). Add a case for it in groupDataByExperiment.'], ...
+               env.exp, env.paradigm);
 end
 
-TalKenet_table = readtable(talKenet_group_file);
+end
+
+% =========================================================================
+
+function grouping_info = loadTalKenetGrouping(env)
+% Load TalKenet group membership from CSV file
+%
+% The file describes the whole experiment, not one paradigm, so it lives in
+% the experiment-level folder (Data/TalKennet/) alongside TK_customLay.mat.
+
+group_file = fullfile(env.paths.exp, 'Number_group_meg_eeg_biomarkers.csv');
+
+if ~isfile(group_file)
+    error(['TalKenet group file not found: %s\n' ...
+           'It holds the group membership for every TalKennet paradigm, ' ...
+           'so it belongs in the experiment-level folder, next to ' ...
+           'TK_customLay.mat.'], group_file);
+end
+
+TalKenet_table = readtable(group_file);
 TalKenet_table.Number = string(pad(string(TalKenet_table.Number), 6, 'left', '0'));
 TalKenet_table.Group = string(TalKenet_table.Group);
 
@@ -90,24 +116,23 @@ TalKenet_table.Group = string(TalKenet_table.Group);
 TalKenet_table.Group(TalKenet_table.Group == "TD") = "NT";
 
 grouping_info.table = TalKenet_table;
-grouping_info.type = 'table';
+grouping_info.method = 'table';
 end
 
 % =========================================================================
 
-function groups = assignDataToGroups(groups, data_arr, grouping_info, exp_type, data_type, IDs_str)
-% Assign data to groups based on experiment type
+function groups = assignDataToGroups(groups, data_arr, grouping_info, data_type, IDs_str)
+% Assign data to groups based on the grouping method
 %
 % INPUTS:
 %   groups        : group struct array to populate
 %   data_arr      : cell array of data to assign
-%   grouping_info : experiment-specific grouping (table or empty)
-%   exp_type      : 'osf_simple' or 'talkennet'
+%   grouping_info : grouping method and its lookup table, from loadGroupingInfo
 %   data_type     : 'LAVI' or 'FFT' (for field naming)
 %   IDs_str       : pre-extracted IDs as strings (optional, for matching)
 
 % If IDs not provided, extract from data
-if nargin < 6 || isempty(IDs_str)
+if nargin < 5 || isempty(IDs_str)
     IDs = cellfun(@(s) s.ID, data_arr, 'UniformOutput', false);
     IDs_str = string(IDs);
 end
@@ -115,7 +140,7 @@ end
 % Assign data to each group
 field_name = sprintf('data_%s', lower(data_type));
 for i = 1:numel(groups)
-    idx = getGroupIndices(groups(i), IDs_str, grouping_info, exp_type);
+    idx = getGroupIndices(groups(i), IDs_str, grouping_info);
     groups(i).(field_name) = data_arr(idx);
 end
 
@@ -124,24 +149,21 @@ end
 
 % =========================================================================
 
-function idx = getGroupIndices(group, IDs_str, grouping_info, exp_type)
+function idx = getGroupIndices(group, IDs_str, grouping_info)
 % Get indices of data belonging to a specific group
-%
-% For OSF_simple: match by label in ID
-% For TalKennet: match by group table
 
-switch lower(exp_type)
-    case 'osf_simple'
+switch grouping_info.method
+    case 'id_label'
         idx = contains(IDs_str, group.label);
 
-    case 'talkennet'
+    case 'table'
         this_group = string(group.name);
         group_IDs = grouping_info.table.Number(...
             grouping_info.table.Group == this_group);
         idx = ismember(IDs_str, group_IDs);
 
     otherwise
-        error('Unknown experiment: %s', exp_type);
+        error('Unknown grouping method: %s', grouping_info.method);
 end
 
 end

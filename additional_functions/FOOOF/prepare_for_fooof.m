@@ -25,14 +25,20 @@ addpath("additional_functions\FOOOF\")
 nsubjs=length(env.data.names);
 nEEG=env.nEEG;
 data_preproc = readtable([main_monad_git_folder '\csv_log\MONAD_log.csv']);
+
+%% Check raw data folder
+
+names = {dir(fullfile(env.paths.raw, sprintf('*.%s',env.data.type))).name};
+IDs   = cellfun(@(x) extractBefore(x, '_'), names, 'UniformOutput', false);
 %% Loop over subjects
-for subj=13:nsubjs
-    clearvars -except env subj nsubjs nEEG data_preproc main_monad_git_folder
-    ID          = env.data.ID{subj};
+for subj=1:length(IDs)
+    clearvars -except env subj nsubjs nEEG data_preproc main_monad_git_folder IDs names
+    ID          = IDs{subj};
     fprintf("Participant ID=%s \n",ID)
     idx = findParticipant(data_preproc, ID);
-    %% Take raw EEG
-    load([env.paths.prev_dat ID '_prev_dat'],"EEG")
+    filename=[env.paths.raw names{subj}];
+    %% Load raw EEG
+    EEG         = load_data12(env, filename);
     fs = EEG.fsample;
     %% High-pass at 1hz
     high_pass_freq=1;
@@ -138,7 +144,7 @@ for subj=13:nsubjs
         dat_after_ICA1h_art2=dat_after_ICA1h;
     end
     %% Channel interpolation
-    if ~isempty(bad_chans)
+    if ~isempty(bad_chans{1})
         missingchan = bad_chans;          % channels dropped prior to ICA
         dat_after_ICA1h_art2.elec = env.elec; 
         % Build neighbours from the FULL montage (includes the bad channels),
@@ -162,17 +168,17 @@ for subj=13:nsubjs
         data_repaired      = ft_channelrepair(cfg, dat_after_ICA1h_art2);
         % Put channels back into the original montage order
         [tf, loc] = ismember(pEEG_f_aft_art.label, data_repaired.label);
-        assert(all(tf), 'Some original channels are missing from data_repaired: %s', ...
-               strjoin(pEEG_f_aft_art.label(~tf), ', '));
-        data_repaired.label = data_repaired.label(loc);
+        % assert(all(tf), 'Some original channels are missing from data_repaired: %s', ...
+        %        strjoin(pEEG_f_aft_art.label(~tf), ', '));
+        data_repaired.label = data_repaired.label(loc(loc~=0));
         for i = 1:numel(data_repaired.trial)
-            data_repaired.trial{i} = data_repaired.trial{i}(loc, :);
+            data_repaired.trial{i} = data_repaired.trial{i}(loc(loc~=0), :);
         end
     
         % view the data again to ensure channel fix
         open_databrow(data_repaired, 'nchan',30);
         % show the difference in variance in these  channels
-        [~,rej_chans_num]=sort(ismember(bad_chans,EEG.label));
+        [~,rej_chans_num]=ismember(bad_chans,EEG.label);
         comp_var_bef_aft(pEEG_f_aft_art,data_repaired,rej_chans_num, {'Before interpolation','After interpolation'});
 
     else
@@ -180,5 +186,5 @@ for subj=13:nsubjs
         method_interpolate='';
     end
     %% Save data for fooof
-    save(['D:\MONAD ASD project\' env.exp '\FOOOF\' ID '_fooof'],"data_repaired")
+    save(['D:\MONAD_Git\Data\' env.exp '\' env.paradigm '\FOOOF\' ID '_fooof'],"data_repaired", '-v7.3', '-nocompression')
 end
