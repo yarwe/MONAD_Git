@@ -123,8 +123,8 @@ for g = 1:numel(cfg.plot_groups)
     n_excluded = 0;
 
     % Collect peaks from all subjects in this group
-    for i = 1:numel(groups(g_idx).data_LAVI)
-        subj_id = groups(g_idx).data_LAVI{i}.ID;
+    for i = 1:numel(groups(g_idx).data_lavi)
+        subj_id = groups(g_idx).data_lavi{i}.ID;
 
         % Check if excluded
         if ~isempty(cfg.exclude_subjects)

@@ -20,6 +20,9 @@ clear ALLEEG ALLCOM ALLEEG CURRENTSTUDY CURRENTSET globalvars LASTCOM PLUGINLIST
 
 addpath(env.paths.LAVI);
 
+%% Add relevant paths- e.g., LAVI etc.
+addpath(env.paths.LAVI)
+
 %% Set parameters for LAVI and FFT
 clc;
 
@@ -99,7 +102,7 @@ noise_chan = 'Cz';
 cfg = [];
 cfg.use_noise_limits = true;
 cfg.noise_channel = noise_chan;
-cfg.freq_range = [8 13];
+cfg.freq_range = [6 14];
 [borders_all_subj, sigVect_all_subj] = findLAVIBorders(cfg, LAVI_arr, foi);
 
 % Average for central channels
@@ -129,7 +132,7 @@ cfg.average_channels = true;
 % pcfg.noise_var          : whether to plot the pink noise simulations (LAVI only)
 % pcfg.noiseCh            : which channel's pink noise to show
 pcfg = [];
-pcfg.dependant_variable = 'fft';   % 'LAVI' or 'fft'
+pcfg.dependant_variable = 'LAVI';   % 'LAVI' or 'fft'
 pcfg.plot_groups = {'ASD','NT'};
 pcfg.chosen_ch   =chosen_ch; % chosen_ch
 pcfg.noise_var   = true;            % set false to hide the pink noise (LAVI only)
@@ -158,9 +161,9 @@ bpcfg = [];
 bpcfg.chosen_ch = chosen_ch;      %chosen_ch;  region of interest (central channels)
 bpcfg.fmax      = max(foi);       % cap the open gamma band to the analysis range (90 Hz)
 bpcfg.compute_peak_freq = true;
-bpcfg.overrideBandName = 'alpha';    % Target by name
-bpcfg.overrideBandLo = 6;             % New lower boundary
-bpcfg.overrideBandHi = 14;            % New upper boundary
+%bpcfg.overrideBandName = 'alpha';    % Target by name
+%bpcfg.overrideBandLo = 6;             % New lower boundary
+%bpcfg.overrideBandHi = 14;            % New upper boundary
 
 
 % NOTE: gamma (30-fmax) spans the 60 Hz line-noise frequency; if line noise is
@@ -197,7 +200,7 @@ cfg = [];
 % cfg.exclude_subjects = {'030801'};
 cfg.type = 'peak_freq';
 cfg.band = 'alpha';  % or use index: 3
-cfg.method = 'density'; % 'histogram' or 'density'
+cfg.method = 'histogram'; % 'histogram' or 'density'
 % cfg.show_individual_subjects = true;  % Shows each subject as a dot
 
 % Density options:
@@ -206,21 +209,31 @@ cfg.method = 'density'; % 'histogram' or 'density'
 % 'ecdf' - Cumulative dist (NO smoothing!)
 % 'rug' - Individual subjects on line- lookss bad, not recommended
 % 'strip' - Scatter with jitter
-cfg.density_method = 'kde'; 
+cfg.density_method = 'strip'; 
 cfg.nbins = 3;      % optional
 plot_peak_dist(cfg, bandPow); 
 
 %% Analyze LAVI peaks in alpha range
+% Alpha shows up as a LAVI peak, so these ask for 'peak' (the default).
+% Ranges that are troughs instead - delta below - pass 'trough'.
+% LAVI_arr is needed in every call: it maps each subject's ID to its row of
+% the borders array. Without it the rows are matched by position, which reads
+% the wrong subjects for every group after the first.
 ch_idx = find(strcmp('Cz', env.lay.label));  % e.g., 34
-alpha_range=[6 14]
-% Compare ALL channels between groups
-stats_all = test_LAVI_peaks_difference(borders_all_subj, groups, alpha_range, 34, LAVI_arr);
+alpha_range=[6 14];
+delta_range=[1 4];
+% Compare ALL channels between groups - alpha
+stats_all = test_LAVI_peaks_difference(borders_all_subj, groups, alpha_range, ch_idx, LAVI_arr, 'peak');
 
-% Compare AVERAGED central channels (no ch_idx, no LAVI_arr needed!)
-stats_central = test_LAVI_peaks_difference(borders_central_subj, groups, alpha_range);
+% Compare AVERAGED central channels (no ch_idx needed for pre-averaged data)
+stats_central = test_LAVI_peaks_difference(borders_central_subj, groups, alpha_range, LAVI_arr, 'peak');
 
 % Compare AVERAGED left-posterior channels
-stats_lp = test_LAVI_peaks_difference(borders_lp_subj_lp, groups, alpha_range);
+stats_lp = test_LAVI_peaks_difference(borders_lp_subj, groups, alpha_range, LAVI_arr, 'peak');
+
+%% Analyze LAVI troughs in delta range
+stats_all_delta     = test_LAVI_peaks_difference(borders_all_subj, groups, delta_range, ch_idx, LAVI_arr, 'trough');
+stats_central_delta = test_LAVI_peaks_difference(borders_central_subj, groups, delta_range, LAVI_arr, 'trough');
 
 
 % Visualization (now pass LAVI_arr)
@@ -347,7 +360,7 @@ for id = 1:length(LAVI_arr)
 end
 
 %% plot signle subject FFT
-for id=1 %:length(FFT_arr)
+for id=1:length(FFT_arr)
     figure;
     ch = 'Cz';
     chIdx1 = find(strcmp(ch,env.lay.label));
@@ -362,6 +375,12 @@ for id=1 %:length(FFT_arr)
     % xticklabels(string(xt));
     % xtickangle(0)
     xlabel('Log (Frequency (Hz))'); ylabel('FFT (log)');
-    title(sprintf('Subject %s',FFT_arr{id}.ID{1}));
+    id_subj=FFT_arr{id}.ID;
+    if iscell(id_subj)
+        id_subj=id_subj{1};
+    elseif ~ischar(id_subj)
+        error('ID is not a string or a cell, check!')
+    end
+    title(sprintf('Subject %s',id_subj));
     ylim([10^-3 10^1]);
 end

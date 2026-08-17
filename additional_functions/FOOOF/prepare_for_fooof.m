@@ -30,14 +30,20 @@ addpath("additional_functions\FOOOF\")
 nsubjs=length(env.data.names);
 nEEG=env.nEEG;
 data_preproc = readtable([main_monad_git_folder '\csv_log\MONAD_log.csv']);
+
+%% Check raw data folder
+
+names = {dir(fullfile(env.paths.raw, sprintf('*.%s',env.data.type))).name};
+IDs   = cellfun(@(x) extractBefore(x, '_'), names, 'UniformOutput', false);
 %% Loop over subjects
-for subj=6:nsubjs
-    clearvars -except env subj nsubjs nEEG data_preproc main_monad_git_folder
-    ID          = env.data.ID{subj};
+for subj=1:length(IDs)
+    clearvars -except env subj nsubjs nEEG data_preproc main_monad_git_folder IDs names
+    ID          = IDs{subj};
     fprintf("Participant ID=%s \n",ID)
     idx = findParticipant(data_preproc, ID);
-    %% Take raw EEG
-    load([env.paths.prev_dat ID '_prev_dat'],"EEG")
+    filename=[env.paths.raw names{subj}];
+    %% Load raw EEG
+    EEG         = load_data12(env, filename);
     fs = EEG.fsample;
     %% High-pass at 1hz
     high_pass_freq=1;
@@ -187,7 +193,7 @@ for subj=6:nsubjs
         loc = loc(tf);
         data_repaired.label = data_repaired.label(loc);
         for i = 1:numel(data_repaired.trial)
-            data_repaired.trial{i} = data_repaired.trial{i}(loc, :);
+            data_repaired.trial{i} = data_repaired.trial{i}(loc(loc~=0), :);
         end
     
         % view the data again to ensure channel fix
@@ -202,5 +208,5 @@ for subj=6:nsubjs
         method_interpolate='';
     end
     %% Save data for fooof
-    save([env.paths.preproc '\FOOOF\' ID '_fooof'],"data_repaired", '-v7.3', '-nocompression')
+    save(fullfile(env.paths.foof, [ID '_fooof']),"data_repaired", '-v7.3', '-nocompression')
 end

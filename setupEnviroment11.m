@@ -122,6 +122,9 @@ env.paths.art      = dirpath(work_dir, 'art');
 env.paths.ICApng   = dirpath(work_dir, 'ICApng');
 env.paths.ica_comp = dirpath(work_dir, 'ica_comp');
 env.paths.prev_dat = dirpath(work_dir, 'prev_dat');
+% Per-participant LAVI/FFT results, written by create_datArr21 as each one
+% finishes so a crash mid-run does not lose the whole pass. Safe to delete.
+env.paths.partial  = dirpath(work_dir, 'partial');
 
 %c = uisetcolor
 env.plots.lineASD = [0.4000    0.6667    0.8000];
