@@ -4,7 +4,18 @@
 % intermediate spectra. Mirrors the steps in fooof_fit.m / Fig. 2 of the paper.
 
 clear; clc; close all;
-load('fooof_psd_cache.mat','S1','f','lab1');
+% Load one subject's spectrum from the PSD cache. Prefers the unified cache
+% built by run_fooof.m (CFG.dataset='TalKennet'); falls back to the legacy one.
+if isfile('fooof_cache_TalKennet.mat')
+    C = load('fooof_cache_TalKennet.mat');
+    ri = find(strcmp(C.roiNames,'occipital'),1); if isempty(ri), ri = 1; end
+    S1 = C.PSD_NT{ri}; f = C.f; lab1 = C.labNT;
+elseif isfile('fooof_psd_cache.mat')
+    load('fooof_psd_cache.mat','S1','f','lab1');   % legacy cache format
+else
+    error(['No PSD cache found. Run run_fooof.m with CFG.dataset=''TalKennet'' ' ...
+           'once to build fooof_cache_TalKennet.mat, then rerun this.']);
+end
 sidx = 1;                                    % subject to walk through
 psd  = S1(:,sidx); ID = lab1{sidx};
 
