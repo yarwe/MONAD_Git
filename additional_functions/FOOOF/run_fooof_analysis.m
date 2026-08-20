@@ -15,10 +15,8 @@
 % WHICH EEG DATA TO USE (read this first)
 % =========================================================================
 % Use PREPROCESSED, artifact-cleaned, continuous resting-state data -- NOT raw.
-% In your pipeline that is the *_fooof.mat files written by prepare_for_fooof.m
-% (the ICA-cleaned FieldTrip struct `data_repaired`; the older *_clean.mat
-% files hold the same thing as `dat_after_ICA`), which already is:
-% demeaned/detrended, band-pass
+% In your pipeline that is the ICA-cleaned FieldTrip struct `dat_after_ICA`
+% (the *_clean.mat files), which already is: demeaned/detrended, band-pass
 % filtered, line-noise notched, bad segments set to NaN, bad channels
 % interpolated, and eye-ICA components removed. That is exactly the right input.
 %
@@ -62,19 +60,18 @@ cfg.peak_width_limits = [1 6];      % min/max bandwidth (Hz)
 cfg.max_n_peaks       = 6;
 cfg.min_peak_height   = 0.05;       % log10 power
 cfg.peak_threshold    = 1.5;        % in SD of the flattened spectrum
-cfg.alpha_band        = [8 13];     % window for picking the alpha peak (Hz)
+cfg.alpha_band        = [7 14];     % window for picking the alpha peak (Hz)
 
+% Outlier-exclusion rule (see fooof_exclude.m). Default = the paper's rule.
+cfg.exclusion         = 'sd';       % 'sd' (2.5-SD-from-mean, paper) | 'r2' | 'none'
+cfg.exclusion_nsd     = 2.5;        % SD multiplier for 'sd' mode
+cfg.exclusion_logic   = 'or';       % flag if R^2 OR error is an outlier ('and' = both)
+cfg.r2_thresh         = 0.90;       % used only if exclusion = 'r2'
+
+fs      = 250;                      % only used by the SELF-TEST; real-data fs is
+                                    % read from each file's .fsample
 win_sec = 2;  overlap = 0.5;        % Welch window / overlap (paper settings)
 
-%% Choose data folder
-if ~RUN_SELFTEST
-    env = setupEnviroment11();
-    cd(env.paths.git)
-    addpath(env.paths.extra_func); addpath(fullfile(env.paths.ft_path, 'external', 'eeglab'));
-    fs=env.data.fsample;
-end
-
-%% Run
 if RUN_SELFTEST
     %% -------------------- SELF-TEST: simulated data --------------------
     % Build two groups whose ground-truth alpha CF and aperiodic exponent
@@ -89,32 +86,45 @@ if RUN_SELFTEST
     name1 = 'GroupA'; name2 = 'GroupB';
 else
     %% -------------------- 2. REAL DATA: build PSD matrices --------------
-    % The input is the *_fooof.mat files written by prepare_for_fooof.m, each
-    % holding one FieldTrip raw struct (one continuous trial with NaN artifact
-    % gaps). This block computes one PSD per subject over a posterior ROI.
-    %
-    % Nothing here is typed in by hand: which experiment/paradigm to read is
-    % set in config_local.m, and collect_fooof_files() below turns that into
-    % the two file lists - so the same script runs on OSF ('A1_fooof.mat' /
-    % 'C1_fooof.mat') and on TalKennet ('030801_fooof.mat') unchanged.
+    % Point each group at its FOLDER of *.mat files -- every .mat in the folder
+    % is treated as one subject, no need to list files. Each file holds a
+    % FieldTrip struct (auto-detected by content, e.g. `data_repaired` or
+    % `dat_after_ICA`) with the continuous recording; the sampling rate is read
+    % from each file. Adjust the folders / ROI as needed.
 
-    addpath(fullfile(env.paths.git, 'additional_functions', 'FOOOF'));
+    roi_alpha = {'Oz','POz','Pz','O1','O2'};               % posterior ROI for alpha
+    roi_ap    = {'Cz'};                                    % Cz for aperiodic (paper)
+    folder1 = 'C:\Users\yarde\Documents\MONAD_Git\Data\TalKennet\tactile\FOOOF\NT';   % group 1
+    folder2 = 'C:\Users\yarde\Documents\MONAD_Git\Data\TalKennet\tactile\FOOOF\ASD';  % group 2
+    name1 = 'NT'; name2 = 'ASD';
 
-    % Folder holding the *_fooof.mat files, either flat or split into
-    % ASD/ and NT/ subfolders. prepare_for_fooof.m writes them here.
-    fooof_root = env.paths.foof;
-
-    roi = {'Oz','POz','Pz','O1','O2'};       % posterior ROI for alpha
-
-    [files1, files2, name1, name2] = collect_fooof_files(env, fooof_root);
-
-    [S1, f, lab1] = build_group_psd(files1, roi, fs, win_sec, overlap);
-    [S2, ~, lab2] = build_group_psd(files2, roi, fs, win_sec, overlap);
+    % PSD cache: computing the spectra reads ~3 GB from disk, so the results
+    % are cached. Delete fooof_psd_cache.mat to force a re-read (e.g. after
+    % changing the ROI, folders, or Welch settings).
+    CACHE = fullfile(pwd, 'fooof_psd_cache.mat');
+    if isfile(CACHE)
+        fprintf('Loading cached PSDs from %s (delete it to force re-read).\n', CACHE);
+        load(CACHE, 'S1','S2','S1_cz','S2_cz','f','lab1','lab2');
+    else
+        % One load per file computes both ROIs (posterior + Cz).
+        [C1, f,  lab1] = build_group_psd(folder1, {roi_alpha, roi_ap}, win_sec, overlap);
+        [C2, f2, lab2] = build_group_psd(folder2, {roi_alpha, roi_ap}, win_sec, overlap);
+        assert(isequal(f, f2), ['The two groups produced different frequency axes ' ...
+            '(different sampling rate or window?). Cannot compare directly.']);
+        S1 = C1{1};  S1_cz = C1{2};      % posterior-ROI and Cz power spectra
+        S2 = C2{1};  S2_cz = C2{2};
+        save(CACHE, 'S1','S2','S1_cz','S2_cz','f','lab1','lab2');
+        fprintf('Cached PSDs to %s\n', CACHE);
+    end
 end
 
 %% -------------------- 3. Fit FOOOF per group --------------------
-cfg1 = cfg; cfg1.labels = lab1; cfg1.group_name = name1;
-cfg2 = cfg; cfg2.labels = lab2; cfg2.group_name = name2;
+% Group colors travel with each group struct, so every plot uses them.
+% Group 1 (controls / NT) -> GREEN ; Group 2 (ASD) -> BLUE.
+COL_CTRL = [0.15 0.60 0.20];   % green
+COL_ASD  = [0.00 0.45 0.74];   % blue
+cfg1 = cfg; cfg1.labels = lab1; cfg1.group_name = name1; cfg1.color = COL_CTRL;
+cfg2 = cfg; cfg2.labels = lab2; cfg2.group_name = name2; cfg2.color = COL_ASD;
 
 G1 = fooof_group(f, S1, cfg1);
 G2 = fooof_group(f, S2, cfg2);
@@ -124,7 +134,7 @@ disp(G2.table);
 
 %% -------------------- 4. Plots --------------------
 % (a) One example single-subject fit (first subject of group 1)
-plot_fooof_fit(G1.fits(1).r, sprintf('%s - %s', name1, G1.labels{1}));
+plot_fooof_fit(G1.fits(1).r, sprintf('%s - %s', name1, G1.labels{1}), G1.color);
 
 % (b) Fits for each group (individual + mean + mean aperiodic)
 plot_fooof_group_fits(G1, G2);
@@ -132,157 +142,123 @@ plot_fooof_group_fits(G1, G2);
 % (c) Between-group comparison of the five parameters (+ stats)
 stats = plot_fooof_group_comparison(G1, G2); %#ok<NASGU>
 
-fprintf('\nDone. Inspect the three figures and the printed comparison table.\n');
+%% -------------------- 5. Comparison WITHOUT outliers --------------------
+% Drop fit-failure subjects, then re-plot the comparison on the clean subset.
+% The exclusion rule is set by cfg.exclusion (see fooof_exclude.m); the default
+% is the paper's 2.5-SD-from-mean rule.
+[keep1, ex1] = fooof_exclude(G1, cfg);
+[keep2, ex2] = fooof_exclude(G2, cfg);
+fprintf('\n--- Outlier exclusion (mode: %s) ---\n', cfg.exclusion);
+if strcmpi(cfg.exclusion,'sd')
+    fprintf('%s: R^2 cut < %.3f, error cut > %.4f  -> excluded: %s\n', name1, ...
+        ex1.r2_cut, ex1.err_cut, ternary(isempty(ex1.excluded_labels),'(none)',strjoin(ex1.excluded_labels,', ')));
+    fprintf('%s: R^2 cut < %.3f, error cut > %.4f  -> excluded: %s\n', name2, ...
+        ex2.r2_cut, ex2.err_cut, ternary(isempty(ex2.excluded_labels),'(none)',strjoin(ex2.excluded_labels,', ')));
+else
+    fprintf('%s excluded: %s\n', name1, ternary(isempty(ex1.excluded_labels),'(none)',strjoin(ex1.excluded_labels,', ')));
+    fprintf('%s excluded: %s\n', name2, ternary(isempty(ex2.excluded_labels),'(none)',strjoin(ex2.excluded_labels,', ')));
+end
+
+G1c = fooof_subset_group(G1, keep1);
+G2c = fooof_subset_group(G2, keep2);
+stats_clean = plot_fooof_group_comparison(G1c, G2c); %#ok<NASGU>
+set(gcf, 'Name', 'FOOOF comparison (outliers excluded)');
+
+%% -------------------- 6. Aperiodic component from Cz --------------------
+% The paper reads the aperiodic component (offset, exponent) from Cz, not the
+% posterior ROI. Fit Cz spectra and compare, using the same exclusion rule.
+if exist('S1_cz','var')
+    cfg1cz = cfg1; cfg1cz.group_name = [name1 ' (Cz)'];
+    cfg2cz = cfg2; cfg2cz.group_name = [name2 ' (Cz)'];
+    G1cz = fooof_group(f, S1_cz, cfg1cz);
+    G2cz = fooof_group(f, S2_cz, cfg2cz);
+
+    kz1 = fooof_exclude(G1cz, cfg);
+    kz2 = fooof_exclude(G2cz, cfg);
+    fprintf('\n--- Cz aperiodic (exclusion mode: %s) ---\n', cfg.exclusion);
+    fprintf('%s: kept %d/%d.  %s: kept %d/%d.\n', ...
+        name1, nnz(kz1), numel(kz1), name2, nnz(kz2), numel(kz2));
+
+    G1czc = fooof_subset_group(G1cz, kz1);
+    G2czc = fooof_subset_group(G2cz, kz2);
+    stats_cz = plot_fooof_group_comparison(G1czc, G2czc); %#ok<NASGU>
+    set(gcf, 'Name', 'Cz aperiodic comparison (look at offset & exponent)');
+end
+
+fprintf('\nDone. Inspect the figures and the printed comparison tables.\n');
 
 
 %% ======================= local helper functions =======================
-function [files_nt, files_asd, name_nt, name_asd] = collect_fooof_files(env, fooof_root)
-% List the *_fooof.mat files of each group, for whichever experiment is set
-% in config_local.m. Every experiment writes the same <ID>_fooof.mat pattern,
-% but what an ID looks like and how it maps onto a group differs:
-%
-%   OSF        'A1_fooof.mat' / 'C1_fooof.mat' - the leading letter is the
-%              group ('A' = ASD, 'C' = NT), the same rule groupDataByExperiment
-%              uses.
-%   TalKennet  '030801_fooof.mat' - the numeric IDs carry no group, so
-%              membership is read from Number_group_meg_eeg_biomarkers.csv in
-%              the experiment-level folder.
-%
-% Both folder layouts are handled: the files may sit directly in
-% <paradigm>/FOOOF/, or be pre-sorted into FOOOF/ASD/ and FOOOF/NT/.
-
-name_nt = 'NT'; name_asd = 'ASD';
-
-if ~exist(fooof_root, 'dir')
-    error(['FOOOF folder not found: %s\n' ...
-           'Run prepare_for_fooof.m first, or point fooof_root at the folder ' ...
-           'holding the *_fooof.mat files.'], fooof_root);
-end
-
-sub_asd = fullfile(fooof_root, name_asd);
-sub_nt  = fullfile(fooof_root, name_nt);
-
-if exist(sub_asd, 'dir') || exist(sub_nt, 'dir')
-    % Layout A: already sorted into per-group subfolders
-    files_asd = list_fooof(sub_asd);
-    files_nt  = list_fooof(sub_nt);
+function [specsC, f, labels] = build_group_psd(source, rois, win_sec, overlap)
+% Compute ROI-averaged PSDs per subject, for one or more ROIs, in a single
+% load per file. `source` is a FOLDER path (every *.mat in it is one subject)
+% or a cell array of explicit file paths. `rois` is a cell array of ROIs, each
+% ROI being a cellstr of channel names (e.g. {{'Oz','POz'}, {'Cz'}}).
+% Returns specsC: 1 x numel(rois) cell, each [nFreq x nSubj] linear-power PSD.
+if ischar(source) || isstring(source)
+    L = dir(fullfile(char(source), '*.mat'));
+    files = fullfile(char(source), {L.name});
+    if isempty(files), error('No .mat files found in folder: %s', char(source)); end
 else
-    % Layout B: one flat folder - split it by the experiment's grouping rule
-    all_files = list_fooof(fooof_root);
-    IDs       = string(fooof_ids(all_files));
-
-    switch lower(env.exp)
-        case 'osf'
-            is_asd = startsWith(IDs, 'A');
-            is_nt  = startsWith(IDs, 'C');
-        case 'talkennet'
-            tbl    = load_talkennet_groups(env);
-            is_asd = ismember(IDs, tbl.Number(tbl.Group == "ASD"));
-            is_nt  = ismember(IDs, tbl.Number(tbl.Group == "NT"));
-        otherwise
-            error(['Grouping is not defined for experiment ''%s''. Add a case ' ...
-                   'for it in collect_fooof_files (see groupDataByExperiment ' ...
-                   'for the same per-experiment rules).'], env.exp);
-    end
-
-    files_asd = all_files(is_asd);
-    files_nt  = all_files(is_nt);
-
-    skipped = all_files(~(is_asd | is_nt));
-    if ~isempty(skipped)
-        warning('%d file(s) in %s belong to no group and were skipped: %s', ...
-            numel(skipped), fooof_root, strjoin(fooof_ids(skipped), ', '));
-    end
+    files = source;                            % already a cell of file paths
 end
+if ~iscell(rois{1}), rois = {rois}; end        % allow a single ROI cellstr
 
-if isempty(files_nt) || isempty(files_asd)
-    error(['Found %d %s and %d %s file(s) under %s. Expected *_fooof.mat ' ...
-           'files for both groups - check that prepare_for_fooof.m has run ' ...
-           'for this experiment/paradigm.'], ...
-           numel(files_nt), name_nt, numel(files_asd), name_asd, fooof_root);
-end
-
-fprintf('FOOOF input: %d %s + %d %s file(s) from %s\n', ...
-    numel(files_nt), name_nt, numel(files_asd), name_asd, fooof_root);
-end
-
-% ------------------------------------------------------------------------
-function files = list_fooof(folder)
-% Full paths of every *_fooof.mat in folder ({} when the folder is absent).
-files = {};
-if ~exist(folder, 'dir'), return; end
-d = dir(fullfile(folder, '*_fooof.mat'));
-d = d(~[d.isdir]);
-if isempty(d), return; end
-files = fullfile(folder, {d.name});
-end
-
-% ------------------------------------------------------------------------
-function ids = fooof_ids(files)
-% Participant ID of each file: 'A1_fooof.mat' -> 'A1', '030801_fooof.mat' -> '030801'.
-ids = cell(size(files));
-for k = 1:numel(files)
-    [~, nm] = fileparts(files{k});
-    ids{k}  = erase(nm, '_fooof');
-end
-end
-
-% ------------------------------------------------------------------------
-function tbl = load_talkennet_groups(env)
-% TalKennet group membership. The file describes the whole experiment, not one
-% paradigm, so it lives in the experiment-level folder next to TK_customLay.mat
-% (same file and same normalisation as groupDataByExperiment).
-group_file = fullfile(env.paths.exp, 'Number_group_meg_eeg_biomarkers.csv');
-if ~isfile(group_file)
-    error('TalKennet group file not found: %s', group_file);
-end
-tbl        = readtable(group_file);
-tbl.Number = string(pad(string(tbl.Number), 6, 'left', '0'));
-tbl.Group  = string(tbl.Group);
-tbl.Group(tbl.Group == "TD") = "NT";      % TD and NT are the same group
-end
-
-% ------------------------------------------------------------------------
-function [specs, f, labels] = build_group_psd(files, roi, fs, win_sec, overlap)
-% Compute one posterior-ROI PSD per subject from *_fooof.mat FieldTrip data.
-specs = []; f = []; labels = {};
+nRoi = numel(rois);
+specsC = repmat({[]}, 1, nRoi); f = []; labels = {};
 for k = 1:numel(files)
     d = load_ft_struct(files{k});
-    if isempty(d), continue; end
-    if isfield(d, 'fsample') && ~isempty(d.fsample), fs_k = d.fsample; else, fs_k = fs; end
-    ch = find(ismember(d.label, roi));
-    if isempty(ch), warning('No ROI channels in %s; skipping.', files{k}); continue; end
-    % Average PSD across ROI channels (average power, then it is fit once)
-    P = [];
-    for c = ch(:)'
-        [pxx, ff] = psd_nan(d.trial{1}(c,:), fs_k, win_sec, overlap);
-        if isempty(P), P = zeros(numel(pxx), numel(ch)); f = ff; ci = 0; end
-        ci = ci + 1; P(:,ci) = pxx; %#ok<AGROW>
+    if isempty(d)
+        warning('No FieldTrip struct (with .label/.trial) in %s; skipping.', files{k});
+        continue;
     end
-    specs(:, end+1) = mean(P, 2, 'omitnan'); %#ok<AGROW>
-    id = fooof_ids(files(k));
-    labels{end+1} = id{1}; %#ok<AGROW>
+    fs = d.fsample;                            % sampling rate read from the file
+    roiPow = cell(1,nRoi); ok = true;
+    for r = 1:nRoi
+        ch = find(ismember(d.label, rois{r}));
+        if isempty(ch)
+            warning('None of channels {%s} in %s; skipping subject.', ...
+                strjoin(rois{r}, ','), files{k});
+            ok = false; break;
+        end
+        P = zeros(0, numel(ch)); ci = 0;
+        for c = ch(:)'
+            [pxx, ff] = psd_nan(d.trial{1}(c,:), fs, win_sec, overlap);
+            if isempty(f), f = ff; end
+            if isempty(P), P = zeros(numel(pxx), numel(ch)); end
+            ci = ci + 1; P(:,ci) = pxx;
+        end
+        roiPow{r} = mean(P, 2, 'omitnan');     % average power across ROI channels
+    end
+    if ~ok, continue; end
+    for r = 1:nRoi, specsC{r}(:, end+1) = roiPow{r}; end %#ok<AGROW>
+    [~, nm] = fileparts(files{k});
+    labels{end+1} = regexprep(nm, '_(fooof|clean)$', ''); %#ok<AGROW> % strip suffix
+    fprintf('  loaded %s (fs=%g)\n', labels{end}, fs);
 end
 end
 
-% ------------------------------------------------------------------------
-function d = load_ft_struct(file)
-% Load the one FieldTrip raw struct stored in file, whatever it is called.
-% prepare_for_fooof.m saves `data_repaired`; the older *_clean.mat files save
-% `dat_after_ICA`, so accept either (and any other single struct).
-S      = load(file);
-fields = fieldnames(S);
-known  = intersect({'data_repaired', 'dat_after_ICA'}, fields, 'stable');
-if ~isempty(known)
-    d = S.(known{1});
-elseif numel(fields) == 1
-    d = S.(fields{1});
-else
-    warning('Cannot tell which variable holds the data in %s (found: %s); skipping.', ...
-        file, strjoin(fields', ', '));
-    d = []; return;
+function out = ternary(cond, a, b)
+if cond, out = a; else, out = b; end
 end
-if iscell(d), d = d{1}; end                   % some files store it wrapped
+
+function d = load_ft_struct(file)
+% Load a .mat and return the first variable that looks like a FieldTrip raw
+% struct (has .label and .trial). Handles arbitrary variable names, e.g.
+% `data_repaired`, `dat_after_ICA`. Ensures a .fsample field is present.
+d = [];
+S = load(file);
+fn = fieldnames(S);
+for i = 1:numel(fn)
+    v = S.(fn{i});
+    if iscell(v) && ~isempty(v), v = v{1}; end          % unwrap {struct}
+    if isstruct(v) && isfield(v,'label') && isfield(v,'trial')
+        if ~isfield(v,'fsample') || isempty(v.fsample)
+            v.fsample = round(1 / median(diff(v.time{1})));  % derive if missing
+        end
+        d = v; return;
+    end
+end
 end
 
 function specs = sim_group(f, n, ap, pk, noise)

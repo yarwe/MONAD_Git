@@ -36,7 +36,7 @@ data_preproc = readtable([main_monad_git_folder '\csv_log\MONAD_log.csv']);
 names = {dir(fullfile(env.paths.raw, sprintf('*.%s',env.data.type))).name};
 IDs   = cellfun(@(x) extractBefore(x, '_'), names, 'UniformOutput', false);
 %% Loop over subjects
-for subj=1:length(IDs)
+for subj=2:length(IDs)
     clearvars -except env subj nsubjs nEEG data_preproc main_monad_git_folder IDs names
     ID          = IDs{subj};
     fprintf("Participant ID=%s \n",ID)

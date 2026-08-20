@@ -15,8 +15,8 @@ function plot_fooof_group_fits(G1, G2)
 %
 % See also: fooof_group, plot_fooof_group_comparison
 
-c1 = [0.00 0.45 0.74];      % blue  (group 1)
-c2 = [0.85 0.33 0.10];      % orange(group 2)
+c1 = group_color(G1, [0.00 0.45 0.74]);   % group 1 color (falls back to blue)
+c2 = group_color(G2, [0.85 0.33 0.10]);   % group 2 color (falls back to orange)
 
 [f1, M1, A1] = collect_curves(G1);
 [f2, M2, A2] = collect_curves(G2);
@@ -75,4 +75,8 @@ end
 
 function s = strtrim_name(s, dflt)
 if isempty(s), s = dflt; end
+end
+
+function c = group_color(G, dflt)
+if isfield(G,'color') && ~isempty(G.color), c = G.color; else, c = dflt; end
 end

@@ -84,6 +84,7 @@ G.error      = err;
 G.has_alpha  = has_alpha;
 G.alpha_band = cfg.alpha_band;
 G.group_name = cfg.group_name;
+if isfield(cfg,'color') && ~isempty(cfg.color), G.color = cfg.color(:)'; else, G.color = []; end
 G.cfg        = cfg;
 
 % Subject labels

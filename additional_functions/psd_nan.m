@@ -4,7 +4,8 @@ function [pxx, f] = psd_nan(x, fs, win_sec, overlap, print_window_info)
 %   fs       - sampling rate (Hz)
 %   win_sec  - window length in seconds (e.g. 2)
 %   overlap  - fraction 0-1 (e.g. 0.5)
-% print_window_info - 1: yes, 0: no.
+% print_window_info - 1: yes, 0: no (default 0 if not supplied).
+    if nargin < 5 || isempty(print_window_info), print_window_info = 0; end
     L    = round(win_sec * fs);
     hop  = max(1, round(L * (1 - overlap)));
     w    = hann(L);

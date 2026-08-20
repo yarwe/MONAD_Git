@@ -1,4 +1,4 @@
-function plot_fooof_fit(res, ttl)
+function plot_fooof_fit(res, ttl, col)
 % PLOT_FOOOF_FIT  Show a single FOOOF model fit (data, aperiodic, full model, peaks).
 %
 % Reproduces the style of Fig. 2h in Donoghue et al. (2020): the original
@@ -8,10 +8,14 @@ function plot_fooof_fit(res, ttl)
 % INPUTS
 %   res - output struct from fooof_fit
 %   ttl - (optional) title string
+%   col - (optional) RGB color for the full-model line (e.g. a group color).
+%         Defaults to red. The aperiodic line is drawn neutral gray so it
+%         never clashes with the model color.
 %
 % See also: fooof_fit, plot_fooof_group_fits
 
 if nargin < 2 || isempty(ttl), ttl = 'FOOOF model fit'; end
+if nargin < 3 || isempty(col), col = [0.85 0.15 0.15]; end
 
 f  = res.freqs;
 lp = res.log_spectrum;
@@ -20,8 +24,8 @@ figure('Name','FOOOF fit','NumberTitle','off','Position',[100 100 780 520]);
 hold on;
 
 hData  = plot(f, lp,               'k-',  'LineWidth', 1.6);
-hModel = plot(f, res.fooofed_spectrum, 'r-', 'LineWidth', 1.8);
-hAp    = plot(f, res.ap_fit,       'b--', 'LineWidth', 1.5);
+hModel = plot(f, res.fooofed_spectrum, '-', 'Color', col, 'LineWidth', 1.8);
+hAp    = plot(f, res.ap_fit, '--', 'Color', [0.45 0.45 0.45], 'LineWidth', 1.5);
 
 % Mark each fitted peak at its center frequency, on the full model curve
 pk = res.peak_params;                        % [CF PW BW]

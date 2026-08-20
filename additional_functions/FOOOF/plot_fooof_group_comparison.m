@@ -18,7 +18,8 @@ function stats = plot_fooof_group_comparison(G1, G2)
 %
 % See also: fooof_group, plot_fooof_group_fits
 
-c1 = [0.00 0.45 0.74]; c2 = [0.85 0.33 0.10];
+c1 = group_color(G1, [0.00 0.45 0.74]);   % group 1 color (falls back to blue)
+c2 = group_color(G2, [0.85 0.33 0.10]);   % group 2 color (falls back to orange)
 n1name = getname(G1,'Group 1'); n2name = getname(G2,'Group 2');
 
 params = { ...
@@ -95,6 +96,10 @@ end
 
 function name = getname(G, dflt)
 name = G.group_name; if isempty(name), name = dflt; end
+end
+
+function c = group_color(G, dflt)
+if isfield(G,'color') && ~isempty(G.color), c = G.color; else, c = dflt; end
 end
 
 function s = sig_star(p)
