@@ -24,10 +24,20 @@ clear; clc; close all;
 
 %% ===================== CONFIG (edit this) =====================
 CFG.dataset  = 'OSF';         % 'OSF' | 'TalKennet' | 'combined'
-CFG.engine   = 'original';    % 'original' | 'native'
-CFG.settings = 'library';     % 'library' | 'resting'
-CFG.exclusion= 'sd';          % bad-fit exclusion: 'sd' (paper 2.5-SD) | 'r2' | 'none'
+CFG.engine   = 'native';    % 'original' | 'native'
+CFG.settings = 'resting';     % 'library' | 'resting'
+CFG.exclusion= 'none';          % bad-fit exclusion: 'sd' (paper 2.5-SD) | 'r2' | 'none'
 CFG.show_fits= false;         % also draw the individual+mean fit overlay per ROI
+
+% --- Optional fit-parameter overrides (leave [] to use the CFG.settings preset).
+%     Presets:  'library' -> width [0.5 12], max Inf, min_height 0,    threshold 2.0
+%               'resting' -> width [1 6],    max 6,   min_height 0.05, threshold 1.5
+%     Set any of these to force just that one parameter (e.g. threshold = 1.5),
+%     keeping the rest of the chosen preset. Useful for replicating an old run.
+CFG.peak_threshold    = [];   % e.g. 1.5  (peak-detection floor, in SD of flat spectrum)
+CFG.peak_width_limits = [];   % e.g. [1 6]
+CFG.max_n_peaks       = [];   % e.g. 6
+CFG.min_peak_height   = [];   % e.g. 0.05
 
 CFG.rois = struct( ...
     'central',   {{'Cz','C1','C2','FCz','FC1','FC2'}}, ...
@@ -40,6 +50,9 @@ CFG.python  = 'C:\Users\yarde\AppData\Local\Programs\Python\Python38\python.exe'
 
 % Dataset registry: each dataset has an NT (control) and ASD folder.
 ROOT = 'C:\Users\yarde\Documents\MONAD_Git\Data';
+add_func_path='C:\Users\yarde\Documents\MONAD_Git\additional_functions\';
+addpath(add_func_path)
+addpath([add_func_path 'FOOOF'])
 DATA.OSF.tag='OSF';  DATA.OSF.NT=[ROOT '\OSF\simple\FOOOF\NT'];        DATA.OSF.ASD=[ROOT '\OSF\simple\FOOOF\ASD'];
 DATA.TalKennet.tag='TK'; DATA.TalKennet.NT=[ROOT '\TalKennet\tactile\FOOOF\NT']; DATA.TalKennet.ASD=[ROOT '\TalKennet\tactile\FOOOF\ASD'];
 %% =============================================================
@@ -105,6 +118,14 @@ switch lower(CFG.settings)
     case 'resting', pw=[1 6];    mx=6;   mph=0.05; pt=1.5;   % paper resting-EEG
     otherwise, error('CFG.settings must be library or resting.');
 end
+% Apply any explicit overrides (a set CFG.* field wins over the preset).
+if ~isempty(CFG.peak_threshold),    pt  = CFG.peak_threshold;    end
+if ~isempty(CFG.peak_width_limits), pw  = CFG.peak_width_limits; end
+if ~isempty(CFG.max_n_peaks),       mx  = CFG.max_n_peaks;       end
+if ~isempty(CFG.min_peak_height),   mph = CFG.min_peak_height;   end
+fprintf(['Engine: %s | fit: width=%s, max_n_peaks=%g, min_peak_height=%g, ' ...
+         'peak_threshold=%g\n'], CFG.engine, mat2str(pw), mx, mph, pt);
+
 base = struct('freq_range',CFG.freq_range,'aperiodic_mode','fixed', ...
     'peak_width_limits',pw,'max_n_peaks',mx,'min_peak_height',mph,'peak_threshold',pt, ...
     'alpha_band',CFG.alpha_band,'exclusion',CFG.exclusion,'exclusion_nsd',2.5,'exclusion_logic','or');
