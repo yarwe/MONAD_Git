@@ -11,10 +11,13 @@
 %   * CFG.dataset : 'OSF' | 'TalKennet' | 'combined'   (combined = pool both)
 %   * CFG.engine  : 'original' (peer-reviewed Python FOOOF) | 'native' (fooof_fit.m)
 %   * CFG.settings: 'library' (FOOOF defaults) | 'resting' (paper resting-EEG)
-%   * CFG.rois    : struct of ROI name -> channel list (add/remove freely)
-%   First run per dataset reloads the raw *_fooof.mat and caches the ROI power
-%   spectra (fooof_cache_<dataset>.mat); later runs are instant. Delete that
-%   cache to force a rebuild (e.g. after changing ROIs or the Welch window).
+%   * CFG.rois    : struct of ROI name -> channel list. A channel list may be
+%                   the string 'all' = every shared electrode (intersected
+%                   across datasets when CFG.dataset='combined').
+%   First run per dataset reloads the raw *_fooof.mat and caches PER-CHANNEL
+%   spectra (fooof_cache_<dataset>.mat); changing ROIs/electrodes is then
+%   instant (no rebuild). The cache rebuilds only if the montage or the Welch
+%   window/frequency grid changes.
 %
 % Requires (only when CFG.engine='original'): Python `fooof` installed, MATLAB
 % pointed at it (CFG.python), and the fooof_mat/ folder next to this script.
@@ -29,6 +32,7 @@ CFG.settings = 'resting';     % 'library' | 'resting'
 CFG.exclusion= 'sd';          % bad-fit exclusion: 'sd' (paper 2.5-SD) | 'r2' | 'none'
 CFG.show_fits= true;         % also draw the individual+mean fit overlay per ROI
 CFG.save_tables = true;       % write CSV summary tables (all + excluded) per run
+CFG.run_label   = '';         % optional tag added to output filenames (keep runs separate)
 
 % --- Optional fit-parameter overrides (leave [] to use the CFG.settings preset).
 %     Presets:  'library' -> width [0.5 12], max Inf, min_height 0,    threshold 2.0
@@ -41,13 +45,17 @@ CFG.max_n_peaks       = [];   % e.g. 6
 CFG.min_peak_height   = [];   % e.g. 0.05
 
 CFG.rois = struct( ...
-    'central',   {{'Cz','C1','C2','FCz','FC1','FC2'}}, ...
-    'occipital', {{'Oz','POz','Pz','O1','O2'}} );
+    'frontal',{{'Fp1','Fpz','Fp2','AF7','AF3','AFz','AF4','AF8','F7','F5','F3','F1','Fz','F2','F4','F6','F8'}},...
+    'central',   {{'FC3','FC1','FCz','FC2','FC4','C3','C1','Cz','C2','C4','CP1','CPz','CP2'}}, ...
+    'temporalL', {{'FT7','FC5','T7','C5','TP7','CP5','P7','P9'}},...
+    'temporalR', {{'FT8','FC6','T8','C6','TP8','CP6','P8','P10'}},...
+    'parietal', {{'CP3','CP4','P5','P3','P1','Pz','P2','P4','P6'}},...
+    'occipital', {{'PO7','PO3','POz','PO4','PO8','O1','Oz','O2','Iz'}});
 
 CFG.freq_range = [2 40];      % FOOOF fit range (Hz)
 % Bands to analyze. EACH band gets its own periodic figure (center freq, power,
 % bandwidth). Names are free-form; add/remove as you like.
-CFG.bands = struct('alpha',[8 13]);   % e.g. struct('theta',[4 8],'alpha',[8 13],'beta',[13 30])
+CFG.bands = struct('delta',[1,4],'theta',[4,8],'alpha',[8 13],'beta',[13 30], 'gamma',[30 40]);   % e.g. struct('theta',[4 8],'alpha',[8 13],'beta',[13 30])
 CFG.win_sec = 2; CFG.overlap = 0.5;              % Welch window / overlap
 CFG.python  = 'C:\Users\yarde\AppData\Local\Programs\Python\Python38\python.exe';
 
@@ -78,9 +86,6 @@ tags       = cellfun(@(s) s.tag, sets, 'UniformOutput', false);
 % differs, so cropping/interpolating to a shared grid aligns them exactly).
 df = 1/CFG.win_sec; f = (0:df:45)';
 
-roiNames = fieldnames(CFG.rois);
-roiList  = cellfun(@(n) CFG.rois.(n), roiNames, 'UniformOutput', false);
-
 %% ---- engine setup ----
 if strcmpi(CFG.engine,'original')
     try
@@ -97,23 +102,48 @@ else
     Gfit = @fooof_group;
 end
 
-%% ---- build (or load) ROI power spectra ----
+%% ---- build (or load) PER-CHANNEL power spectra ----
+% The cache stores PSDs for EVERY shared channel, so any ROI (including 'all')
+% is just an instant re-average. It rebuilds only when the dataset's montage or
+% the frequency grid changes -- NOT when you change ROIs/electrodes.
 CACHE = fullfile(here, sprintf('fooof_cache_%s.mat', CFG.dataset));
 if isfile(CACHE)
     S = load(CACHE);
-    if isequal(S.roiNames, roiNames) && isequal(S.f, f)
-        PSD_NT=S.PSD_NT; PSD_ASD=S.PSD_ASD; labNT=S.labNT; labASD=S.labASD;
-        fprintf('Loaded %s PSDs from cache.\n', CFG.dataset);
+    if isfield(S,'commonChans') && isequal(S.f, f)
+        chanNT=S.chanNT; chanASD=S.chanASD; labNT=S.labNT; labASD=S.labASD;
+        commonChans=S.commonChans;
+        fprintf('Loaded %s per-channel PSDs from cache (%d channels).\n', CFG.dataset, numel(commonChans));
     else
-        fprintf('Cache ROI/grid mismatch -> rebuilding.\n'); clear S; rebuild=true;
+        fprintf('Cache mismatch -> rebuilding.\n'); clear S;
     end
 end
-if ~exist('PSD_NT','var')
-    [PSD_NT,  labNT ] = build_group(NTfolders,  tags, roiList, f, CFG.win_sec, CFG.overlap);
-    [PSD_ASD, labASD] = build_group(ASDfolders, tags, roiList, f, CFG.win_sec, CFG.overlap);
-    save(CACHE, 'PSD_NT','PSD_ASD','labNT','labASD','f','roiNames');
-    fprintf('Cached %s PSDs to %s\n', CFG.dataset, CACHE);
+if ~exist('chanNT','var')
+    % Shared montage across the run's dataset(s): montage of the first file of
+    % each dataset, intersected (so combined runs use only shared electrodes).
+    montages = cell(1,numel(sets));
+    for si = 1:numel(sets)
+        Ld = dir(fullfile(sets{si}.NT,'*.mat'));
+        dref = load_ft(fullfile(sets{si}.NT, Ld(1).name)); montages{si} = dref.label(:);
+    end
+    commonChans = montages{1};
+    for si = 2:numel(montages), commonChans = intersect(commonChans, montages{si}, 'stable'); end
+    [chanNT,  labNT ] = build_channel_psd(NTfolders,  tags, commonChans, f, CFG.win_sec, CFG.overlap);
+    [chanASD, labASD] = build_channel_psd(ASDfolders, tags, commonChans, f, CFG.win_sec, CFG.overlap);
+    save(CACHE, 'chanNT','chanASD','labNT','labASD','f','commonChans');
+    fprintf('Cached %s per-channel PSDs (%d channels) to %s\n', CFG.dataset, numel(commonChans), CACHE);
 end
+
+% Resolve any ROI whose value is 'all' to the shared-channel set (all shared
+% electrodes), then finalize the ROI list.
+rfn = fieldnames(CFG.rois);
+for i = 1:numel(rfn)
+    v = CFG.rois.(rfn{i});
+    if (ischar(v) || isstring(v)) && strcmpi(char(v),'all')
+        CFG.rois.(rfn{i}) = commonChans(:)';
+    end
+end
+roiNames = fieldnames(CFG.rois);
+roiList  = cellfun(@(n) CFG.rois.(n), roiNames, 'UniformOutput', false); %#ok<NASGU>
 
 %% ---- engine fit settings ----
 switch lower(CFG.settings)
@@ -147,8 +177,8 @@ for r = 1:numel(roiNames)
 
     cN=base; cN.labels=labNT;  cN.group_name='NT';  cN.color=COL_NT;
     cA=base; cA.labels=labASD; cA.group_name='ASD'; cA.color=COL_ASD;
-    GN = Gfit(f, PSD_NT{r},  cN);
-    GA = Gfit(f, PSD_ASD{r}, cA);
+    GN = Gfit(f, roi_average(chanNT,  commonChans, chans), cN);
+    GA = Gfit(f, roi_average(chanASD, commonChans, chans), cA);
 
     % ----- ALL subjects: aperiodic figure + one periodic figure per band -----
     fprintf('--- %s: ALL subjects (NT=%d, ASD=%d) ---\n', rn, numel(GN.offset), numel(GA.offset));
@@ -182,7 +212,12 @@ end
 if CFG.save_tables
     bandstr = strjoin(bnames',',');
     tdir = fullfile(here,'summary_tables');
-    tag  = sprintf('%s_%s_%s', CFG.dataset, CFG.engine, CFG.settings);
+    % Filename encodes dataset+engine+settings+ROI names (+ optional run_label)
+    % so different electrode sets don't overwrite each other.
+    lab = ''; if ~isempty(CFG.run_label), lab = ['_' CFG.run_label]; end
+    roitag = strjoin(roiNames','-');
+    if numel(roitag) > 40, roitag = sprintf('%dROIs', numel(roiNames)); end
+    tag  = sprintf('%s_%s_%s_%s%s', CFG.dataset, CFG.engine, CFG.settings, roitag, lab);
     nNT = numel(allNT{1}.offset); nASD = numel(allASD{1}.offset);
 
     optA = struct('name1','NT','name2','ASD');
@@ -203,34 +238,41 @@ end
 fprintf('\nDone. Figures + CSV summary tables (all & excluded) written.\n');
 
 %% ======================= local helpers =======================
-function [specsC, labels] = build_group(folders, tags, rois, f, win_sec, overlap)
-% Pool subjects from one or more folders; return ROI-averaged PSDs (interpolated
-% onto the shared grid f) as a 1 x nRoi cell of [nFreq x nSubj].
-nRoi=numel(rois); specsC=repmat({[]},1,nRoi); labels={};
+function [chanPSD, labels] = build_channel_psd(folders, tags, chans, f, win_sec, overlap)
+% Per-channel PSD for the shared channel set `chans`, for every subject pooled
+% across folders. Returns chanPSD: nFreq x nChan x nSubj (channels in `chans`
+% order), interpolated onto the shared grid f, and the subject labels.
+nCh=numel(chans); chanPSD=zeros(numel(f),nCh,0); labels={};
 for j=1:numel(folders)
     L=dir(fullfile(folders{j},'*.mat')); files=fullfile(folders{j},{L.name});
     if isempty(files), warning('No .mat files in %s', folders{j}); continue; end
     pre=''; if numel(folders)>1 && ~isempty(tags{j}), pre=[tags{j} ':']; end
     for k=1:numel(files)
         d=load_ft(files{k}); if isempty(d), continue; end
-        fs=d.fsample; roiPow=cell(1,nRoi); ok=true;
-        for r=1:nRoi
-            ch=find(ismember(d.label, rois{r}));
-            if isempty(ch), warning('ROI %s channels missing in %s; skipping.', mat2str(r), files{k}); ok=false; break; end
-            P=[]; ci=0; ff=[];
-            for c=ch(:)'
-                [pxx0,ff]=psd_nan(d.trial{1}(c,:), fs, win_sec, overlap);
-                if isempty(P), P=zeros(numel(pxx0),numel(ch)); end
-                ci=ci+1; P(:,ci)=pxx0;
-            end
-            roiAvg=mean(P,2,'omitnan');
-            roiPow{r}=interp1(ff, roiAvg, f, 'linear');   % align to shared grid
+        [tf,loc]=ismember(chans, d.label);
+        if ~all(tf), warning('Channels %s missing in %s; skipping subject.', ...
+                strjoin(chans(~tf),','), files{k}); continue; end
+        M=zeros(numel(f),nCh);
+        for c=1:nCh
+            [pxx,ff]=psd_nan(d.trial{1}(loc(c),:), d.fsample, win_sec, overlap);
+            M(:,c)=interp1(ff,pxx,f,'linear');
         end
-        if ~ok, continue; end
-        for r=1:nRoi, specsC{r}(:,end+1)=roiPow{r}; end %#ok<AGROW>
+        chanPSD(:,:,end+1)=M; %#ok<AGROW>
         [~,nm]=fileparts(files{k}); labels{end+1}=[pre regexprep(nm,'_(fooof|clean)$','')]; %#ok<AGROW>
     end
 end
+end
+
+function P = roi_average(chanPSD, chanLabels, roiChans)
+% Average per-channel PSDs (nFreq x nChan x nSubj) over the ROI channels that
+% exist in the cached montage. Returns nFreq x nSubj.
+[tf,loc]=ismember(roiChans, chanLabels); loc=loc(tf);
+if isempty(loc), error('roi_average: none of the ROI channels are in the montage.'); end
+if numel(loc) < numel(roiChans)
+    warning('roi_average: %d of %d ROI channels not in montage; averaging the rest.', ...
+        numel(roiChans)-numel(loc), numel(roiChans));
+end
+P = squeeze(mean(chanPSD(:,loc,:), 2, 'omitnan'));   % nFreq x nSubj
 end
 
 function d = load_ft(file)
