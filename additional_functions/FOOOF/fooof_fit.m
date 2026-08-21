@@ -96,7 +96,10 @@ flat_spec = lp - ap_curve;                                 % aperiodic-adjusted 
 flat_iter = flat_spec;
 guess = zeros(0,3);                                        % rows [center height sd]
 
-for p = 1:cfg.max_n_peaks
+% max_n_peaks may be Inf (library default); cap the loop at the number of
+% frequency bins so "1:Inf" never triggers MATLAB's for-loop warning. The
+% noise-floor break below is what actually stops the search in practice.
+for p = 1:min(cfg.max_n_peaks, numel(f))
     [mx, idx] = max(flat_iter);
     if mx <= cfg.peak_threshold * std(flat_iter), break; end   % relative noise floor
     if mx <= cfg.min_peak_height,                 break; end   % absolute floor
