@@ -27,7 +27,8 @@ CFG.dataset  = 'OSF';         % 'OSF' | 'TalKennet' | 'combined'
 CFG.engine   = 'original';    % 'original' | 'native'
 CFG.settings = 'resting';     % 'library' | 'resting'
 CFG.exclusion= 'sd';          % bad-fit exclusion: 'sd' (paper 2.5-SD) | 'r2' | 'none'
-CFG.show_fits= false;         % also draw the individual+mean fit overlay per ROI
+CFG.show_fits= true;         % also draw the individual+mean fit overlay per ROI
+CFG.save_tables = true;       % write CSV summary tables (all + excluded) per run
 
 % --- Optional fit-parameter overrides (leave [] to use the CFG.settings preset).
 %     Presets:  'library' -> width [0.5 12], max Inf, min_height 0,    threshold 2.0
@@ -137,6 +138,8 @@ COL_NT=[0.15 0.60 0.20]; COL_ASD=[0.00 0.45 0.74];
 bnames = fieldnames(CFG.bands);
 fprintf('\n=== Dataset: %s | engine: %s | settings: %s | bands: %s ===\n', ...
     CFG.dataset, CFG.engine, CFG.settings, strjoin(bnames',', '));
+% Accumulators for the summary tables (per ROI): all-subjects and excluded.
+roiLbl=cell(1,numel(roiNames)); allNT=roiLbl; allASD=roiLbl; exNT=roiLbl; exASD=roiLbl;
 for r = 1:numel(roiNames)
     rn = roiNames{r}; chans = CFG.rois.(rn);
     chanLabel = sprintf('%s (%s)', [upper(rn(1)) rn(2:end)], strjoin(chans,','));
@@ -161,6 +164,7 @@ for r = 1:numel(roiNames)
     fprintf('--- %s: bad-fit excluded (%s) | NT out: %s | ASD out: %s ---\n', rn, CFG.exclusion, ...
         none_if_empty(exN.excluded_labels), none_if_empty(exA.excluded_labels));
     GNx = fooof_subset_group(GN,kN); GAx = fooof_subset_group(GA,kA);
+    roiLbl{r}=chanLabel; allNT{r}=GN; allASD{r}=GA; exNT{r}=GNx; exASD{r}=GAx;
     plot_fooof_aperiodic(GNx, GAx, chanLabel);
     set(gcf,'Name',sprintf('%s | %s | excluded | aperiodic', CFG.dataset, rn));
     for bi = 1:numel(bnames)
@@ -173,7 +177,30 @@ for r = 1:numel(roiNames)
         set(gcf,'Name',sprintf('%s | %s | fits', CFG.dataset, rn));
     end
 end
-fprintf('\nDone. Per ROI: an aperiodic figure + one periodic figure per band (all + excluded).\n');
+
+%% ---- summary tables (all subjects + excluded), saved to CSV ----
+if CFG.save_tables
+    bandstr = strjoin(bnames',',');
+    tdir = fullfile(here,'summary_tables');
+    tag  = sprintf('%s_%s_%s', CFG.dataset, CFG.engine, CFG.settings);
+    nNT = numel(allNT{1}.offset); nASD = numel(allASD{1}.offset);
+
+    optA = struct('name1','NT','name2','ASD');
+    optA.titleStr = sprintf(['%s | NT (N=%d) vs ASD (N=%d) | engine=%s, settings=%s, ' ...
+        'bands=[%s] | ALL subjects (no exclusions)'], CFG.dataset, nNT, nASD, ...
+        CFG.engine, CFG.settings, bandstr);
+    optA.csvpath = fullfile(tdir, sprintf('fooof_summary_%s_ALL.csv', tag));
+    fooof_summary_table(roiLbl, allNT, allASD, optA);
+
+    optE = optA;
+    optE.titleStr = sprintf(['%s | NT (started N=%d) vs ASD (started N=%d) | engine=%s, ' ...
+        'settings=%s, bands=[%s] | AFTER bad-fit exclusion (rule=%s); per-cell n = included NT/ASD'], ...
+        CFG.dataset, nNT, nASD, CFG.engine, CFG.settings, bandstr, CFG.exclusion);
+    optE.csvpath = fullfile(tdir, sprintf('fooof_summary_%s_EXCLUDED.csv', tag));
+    fooof_summary_table(roiLbl, exNT, exASD, optE);
+end
+
+fprintf('\nDone. Figures + CSV summary tables (all & excluded) written.\n');
 
 %% ======================= local helpers =======================
 function [specsC, labels] = build_group(folders, tags, rois, f, win_sec, overlap)
