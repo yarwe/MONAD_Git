@@ -26,7 +26,7 @@ opt.subtitleStr = chan_label;
 
 dataN = {GN.offset, GN.exponent};
 dataA = {GA.offset, GA.exponent};
-ylabels = {'offset (log_{10} \muV^2/Hz)', 'exponent (unitless)'};
+ylabels = {'offset (log_{10} \muV^2/Hz)', 'exponent'};
 
 stats = fooof_compare_panels(dataN, dataA, ylabels, opt);
 end
