@@ -24,9 +24,9 @@ clear; clc; close all;
 
 %% ===================== CONFIG (edit this) =====================
 CFG.dataset  = 'OSF';         % 'OSF' | 'TalKennet' | 'combined'
-CFG.engine   = 'native';    % 'original' | 'native'
+CFG.engine   = 'original';    % 'original' | 'native'
 CFG.settings = 'resting';     % 'library' | 'resting'
-CFG.exclusion= 'none';          % bad-fit exclusion: 'sd' (paper 2.5-SD) | 'r2' | 'none'
+CFG.exclusion= 'sd';          % bad-fit exclusion: 'sd' (paper 2.5-SD) | 'r2' | 'none'
 CFG.show_fits= false;         % also draw the individual+mean fit overlay per ROI
 
 % --- Optional fit-parameter overrides (leave [] to use the CFG.settings preset).
@@ -44,7 +44,9 @@ CFG.rois = struct( ...
     'occipital', {{'Oz','POz','Pz','O1','O2'}} );
 
 CFG.freq_range = [2 40];      % FOOOF fit range (Hz)
-CFG.alpha_band = [7 14];      % window to pick the alpha peak
+% Bands to analyze. EACH band gets its own periodic figure (center freq, power,
+% bandwidth). Names are free-form; add/remove as you like.
+CFG.bands = struct('alpha',[8 13]);   % e.g. struct('theta',[4 8],'alpha',[8 13],'beta',[13 30])
 CFG.win_sec = 2; CFG.overlap = 0.5;              % Welch window / overlap
 CFG.python  = 'C:\Users\yarde\AppData\Local\Programs\Python\Python38\python.exe';
 
@@ -128,36 +130,50 @@ fprintf(['Engine: %s | fit: width=%s, max_n_peaks=%g, min_peak_height=%g, ' ...
 
 base = struct('freq_range',CFG.freq_range,'aperiodic_mode','fixed', ...
     'peak_width_limits',pw,'max_n_peaks',mx,'min_peak_height',mph,'peak_threshold',pt, ...
-    'alpha_band',CFG.alpha_band,'exclusion',CFG.exclusion,'exclusion_nsd',2.5,'exclusion_logic','or');
+    'bands',CFG.bands,'exclusion',CFG.exclusion,'exclusion_nsd',2.5,'exclusion_logic','or');
 COL_NT=[0.15 0.60 0.20]; COL_ASD=[0.00 0.45 0.74];
 
 %% ---- fit + compare, per ROI ----
-fprintf('\n=== Dataset: %s | engine: %s | settings: %s ===\n', CFG.dataset, CFG.engine, CFG.settings);
+bnames = fieldnames(CFG.bands);
+fprintf('\n=== Dataset: %s | engine: %s | settings: %s | bands: %s ===\n', ...
+    CFG.dataset, CFG.engine, CFG.settings, strjoin(bnames',', '));
 for r = 1:numel(roiNames)
-    rn = roiNames{r};
-    fprintf('\n########## ROI: %s (%s) ##########\n', rn, strjoin(CFG.rois.(rn),','));
+    rn = roiNames{r}; chans = CFG.rois.(rn);
+    chanLabel = sprintf('%s (%s)', [upper(rn(1)) rn(2:end)], strjoin(chans,','));
+    fprintf('\n########## ROI: %s ##########\n', chanLabel);
 
-    cN=base; cN.labels=labNT;  cN.group_name=['NT '  rn]; cN.color=COL_NT;
-    cA=base; cA.labels=labASD; cA.group_name=['ASD ' rn]; cA.color=COL_ASD;
+    cN=base; cN.labels=labNT;  cN.group_name='NT';  cN.color=COL_NT;
+    cA=base; cA.labels=labASD; cA.group_name='ASD'; cA.color=COL_ASD;
     GN = Gfit(f, PSD_NT{r},  cN);
     GA = Gfit(f, PSD_ASD{r}, cA);
 
+    % ----- ALL subjects: aperiodic figure + one periodic figure per band -----
     fprintf('--- %s: ALL subjects (NT=%d, ASD=%d) ---\n', rn, numel(GN.offset), numel(GA.offset));
-    plot_fooof_group_comparison(GN, GA);
-    set(gcf,'Name',sprintf('%s | %s | ALL', CFG.dataset, rn));
+    plot_fooof_aperiodic(GN, GA, chanLabel);
+    set(gcf,'Name',sprintf('%s | %s | ALL | aperiodic', CFG.dataset, rn));
+    for bi = 1:numel(bnames)
+        plot_fooof_periodic(GN, GA, bnames{bi}, chanLabel);
+        set(gcf,'Name',sprintf('%s | %s | ALL | %s', CFG.dataset, rn, bnames{bi}));
+    end
 
+    % ----- bad-fit excluded -----
     [kN,exN]=fooof_exclude(GN,base); [kA,exA]=fooof_exclude(GA,base);
     fprintf('--- %s: bad-fit excluded (%s) | NT out: %s | ASD out: %s ---\n', rn, CFG.exclusion, ...
         none_if_empty(exN.excluded_labels), none_if_empty(exA.excluded_labels));
-    plot_fooof_group_comparison(fooof_subset_group(GN,kN), fooof_subset_group(GA,kA));
-    set(gcf,'Name',sprintf('%s | %s | excluded', CFG.dataset, rn));
+    GNx = fooof_subset_group(GN,kN); GAx = fooof_subset_group(GA,kA);
+    plot_fooof_aperiodic(GNx, GAx, chanLabel);
+    set(gcf,'Name',sprintf('%s | %s | excluded | aperiodic', CFG.dataset, rn));
+    for bi = 1:numel(bnames)
+        plot_fooof_periodic(GNx, GAx, bnames{bi}, chanLabel);
+        set(gcf,'Name',sprintf('%s | %s | excluded | %s', CFG.dataset, rn, bnames{bi}));
+    end
 
     if CFG.show_fits   % optional: individual + group-mean fit overlay
         plot_fooof_group_fits(GN, GA);
         set(gcf,'Name',sprintf('%s | %s | fits', CFG.dataset, rn));
     end
 end
-fprintf('\nDone. One "all" and one "excluded" figure per ROI.\n');
+fprintf('\nDone. Per ROI: an aperiodic figure + one periodic figure per band (all + excluded).\n');
 
 %% ======================= local helpers =======================
 function [specsC, labels] = build_group(folders, tags, rois, f, win_sec, overlap)
